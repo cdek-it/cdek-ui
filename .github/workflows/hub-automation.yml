@@ -1,32 +1,32 @@
-# name: 🎯 Hub Automation
+name: 🎯 Hub Automation
 
-# on:
-#   issues:
-#     types: [opened]
-#   workflow_dispatch:
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
 
-# jobs:
-#   welcome-new-issue:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Welcome new issue
-#         uses: actions/github-script@v7
-#         with:
-#           script: |
-#             const { issue } = context.payload;
+jobs:
+  welcome-new-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Welcome new issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { issue } = context.payload;
             
-#             await github.rest.issues.createComment({
-#               owner: context.repo.owner,
-#               repo: context.repo.repo,
-#               issue_number: issue.number,
-#               body: `👋 Спасибо за ваше issue! 
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `👋 Спасибо за ваше issue! 
               
-#                     Этот проект использует Hub & Satellite архитектуру. 
+                    Этот проект использует Hub & Satellite архитектуру. 
 
-#                     **Следующие шаги:**
-#                     1. Issue будет рассмотрено командой
-#                     2. При одобрении - будет создана задача в соответствующем satellite
-#                     3. Разработка будет вестись в satellite репозитории
+                    **Следующие шаги:**
+                    1. Issue будет рассмотрено командой
+                    2. При одобрении - будет создана задача в соответствующем satellite
+                    3. Разработка будет вестись в satellite репозитории
 
-#                     _Автоматическое сообщение от Hub системы_`
-#               });
+                    _Автоматическое сообщение от Hub системы_`
+              });
