@@ -22,20 +22,20 @@ jobs:
             const labels = require('./.github/labels-config.json').labels;
             console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
 
-      - name: Sync to ozon-test
-        uses: actions/github-script@v7
-        env:
-          TARGET_REPO: "ozon-test"
-        with:
-          script: |
-            const labels = require('./.github/labels-config.json').labels;
-            console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
+      # - name: Sync to ozon-test
+      #   uses: actions/github-script@v7
+      #   env:
+      #     TARGET_REPO: "ozon-test"
+      #   with:
+      #     script: |
+      #       const labels = require('./.github/labels-config.json').labels;
+      #       console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
 
-      - name: Sync to wildberries-test
-        uses: actions/github-script@v7
-        env:
-          TARGET_REPO: "wildberries-test"
-        with:
-          script: |
-            const labels = require('./.github/labels-config.json').labels;
-            console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
+      # - name: Sync to wildberries-test
+      #   uses: actions/github-script@v7
+      #   env:
+      #     TARGET_REPO: "wildberries-test"
+      #   with:
+      #     script: |
+      #       const labels = require('./.github/labels-config.json').labels;
+      #       console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
