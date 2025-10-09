@@ -12,9 +12,9 @@
 
 | Проект | Статус | Команда |
 |--------|--------|---------|
-| frontend-app-test | 🟢 Active | Frontend Team |
-| backend-api-test | 🟢 Active | Backend Team |
-| mobile-app-test | 🟡 Development | Mobile Team |
+| yandex-test | 🟢 Active | Integration Team |
+| ozon-test | 🟢 Active | Integration Team |
+| wildberries-test | 🟡 Development | Integration Team |
 
 ## 📊 Dashboard
 
