@@ -1,6 +1,6 @@
 ---
-name: "Bug"
-description: "Исправление багов"
+name: Bug
+about: Исправление багов
 title: "[Bug]: "
 labels: ["type/bug"]
 assignees: ""
