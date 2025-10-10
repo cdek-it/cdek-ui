@@ -1,158 +1,177 @@
 {
-  "labels": [
-    {
-      "name": "type/bug",
-      "color": "d73a4a", 
-      "description": "Исправление багов"
-    },
-    {
-      "name": "type/feature",
-      "color": "a2eeef",
-      "description": "Новая функциональность"
-    },
-    {
-      "name": "type/enhancement",
-      "color": "7057ff",
-      "description": "Улучшение существующего"
-    },
-    {
-      "name": "type/refactor",
-      "color": "fbca04",
-      "description": "Рефакторинг без изменения API"
-    },
-    {
-      "name": "type/documentation",
-      "color": "0075ca",
-      "description": "Документация"
-    },
-    {
-      "name": "type/testing",
-      "color": "1d76db",
-      "description": "Тесты и QA"
-    },
-    {
-      "name": "type/ci-cd",
-      "color": "0e8a16",
-      "description": "CI/CD и автоматизация"
-    },
-    {
-      "name": "priority/critical", 
-      "color": "b60205",
-      "description": "Блокирующие производство"
-    },
-    {
-      "name": "priority/high",
-      "color": "d93f0b", 
-      "description": "Важные улучшения"
-    },
-    {
-      "name": "priority/medium",
-      "color": "fbca04", 
-      "description": "Стандартные задачи"
-    },
-    {
-      "name": "priority/low",
-      "color": "0e8a16", 
-      "description": "Nice-to-have"
-    },
-    {
-      "name": "effort/xs",
-      "color": "c2e0c6", 
-      "description": "<2 часов, 1-5 строк кода"
-    },
-    {
-      "name": "effort/s",
-      "color": "7057ff", 
-      "description": "<1 дня, простые компоненты"
-    },
-    {
-      "name": "effort/m",
-      "color": "a2eeef", 
-      "description": "2-5 дней, средняя сложность"
-    },
-    {
-      "name": "effort/l",
-      "color": "d876e3", 
-      "description": "1-2 недели, сложные фичи"
-    },
-    {
-      "name": "effort/xl",
-      "color": "f9d71c", 
-      "description": ">2 недель, архитектурные"
-    },
-    {
-      "name": "area/design-system",
-      "color": "e99695", 
-      "description": "Core дизайн-система"
-    },
-    {
-      "name": "area/components",
-      "color": "f9d71c", 
-      "description": "UI компоненты"
-    },
-    {
-      "name": "area/accessibility",
-      "color": "0e8a16", 
-      "description": "A11y и инклюзивность"
-    },
-    {
-      "name": "area/performance",
-      "color": "1d76db", 
-      "description": "Производительность"
-    },
-    {
-      "name": "area/tooling",
-      "color": "5319e7", 
-      "description": "Developer experience"
-    },
-    {
-      "name": "area/i18n",
-      "color": "fbca04", 
-      "description": "Интернационализация"
-    },
-    {
-      "name": "area/mobile",
-      "color": "d876e3", 
-      "description": "Мобильная разработка"
-    },
-    {
-      "name": "platform/web",
-      "description": "Web applications"
-    },
-    {
-      "name": "platform/mobile",
-      "description": "Mobile (iOS/Android)"
-    },
-    {
-      "name": "framework/react",
-      "description": "React specific"
-    },
-    {
-      "name": "framework/vue",
-      "description": "Vue specific"
-    },
-    {
-      "name": "framework/angular",
-      "description": "Angular specific"
-    },
-    {
-      "name": "framework/react-native",
-      "description": "React Native specific"
-    },
-    {
-      "name": "satellite/yandex",
-      "color": "bfdadc",
-      "description": "Относится к yandex"
-    },
-    {
-      "name": "satellite/ozon",
-      "color": "d4c5f9",
-      "description": "Относится к ozon" 
-    },
-    {
-      "name": "satellite/wildberries",
-      "color": "d876e3",
-      "description": "Относится к wildberries" 
-    }
-  ]
+  "labels": {
+    "types": [
+      {
+        "name": "type/bug",
+        "color": "d73a4a", 
+        "description": "Исправление багов"
+      },
+      {
+        "name": "type/feature",
+        "color": "a2eeef",
+        "description": "Новая функциональность"
+      },
+      {
+        "name": "type/enhancement",
+        "color": "7057ff",
+        "description": "Улучшение существующего"
+      },
+      {
+        "name": "type/refactor",
+        "color": "fbca04",
+        "description": "Рефакторинг без изменения API"
+      },
+      {
+        "name": "type/documentation",
+        "color": "0075ca",
+        "description": "Документация"
+      },
+      {
+        "name": "type/testing",
+        "color": "1d76db",
+        "description": "Тесты и QA"
+      },
+      {
+        "name": "type/ci-cd",
+        "color": "0e8a16",
+        "description": "CI/CD и автоматизация"
+      },
+    ],
+    "priority": [
+      {
+        "name": "priority/critical", 
+        "color": "b60205",
+        "description": "Блокирующие производство"
+      },
+      {
+        "name": "priority/high",
+        "color": "d93f0b", 
+        "description": "Важные улучшения"
+      },
+      {
+        "name": "priority/medium",
+        "color": "fbca04", 
+        "description": "Стандартные задачи"
+      },
+      {
+        "name": "priority/low",
+        "color": "0e8a16", 
+        "description": "Nice-to-have"
+      },
+    ],
+    "effort": [
+      {
+        "name": "effort/xs",
+        "color": "c2e0c6", 
+        "description": "<2 часов, 1-5 строк кода"
+      },
+      {
+        "name": "effort/s",
+        "color": "7057ff", 
+        "description": "<1 дня, простые компоненты"
+      },
+      {
+        "name": "effort/m",
+        "color": "a2eeef", 
+        "description": "2-5 дней, средняя сложность"
+      },
+      {
+        "name": "effort/l",
+        "color": "d876e3", 
+        "description": "1-2 недели, сложные фичи"
+      },
+      {
+        "name": "effort/xl",
+        "color": "f9d71c", 
+        "description": ">2 недель, архитектурные"
+      },
+    ],
+    "area": [
+      {
+        "name": "area/design-system",
+        "color": "e99695", 
+        "description": "Core дизайн-система"
+      },
+      {
+        "name": "area/components",
+        "color": "f9d71c", 
+        "description": "UI компоненты"
+      },
+      {
+        "name": "area/accessibility",
+        "color": "0e8a16", 
+        "description": "A11y и инклюзивность"
+      },
+      {
+        "name": "area/performance",
+        "color": "1d76db", 
+        "description": "Производительность"
+      },
+      {
+        "name": "area/tooling",
+        "color": "5319e7", 
+        "description": "Developer experience"
+      },
+      {
+        "name": "area/i18n",
+        "color": "fbca04", 
+        "description": "Интернационализация"
+      },
+      {
+        "name": "area/mobile",
+        "color": "d876e3", 
+        "description": "Мобильная разработка"
+      },
+    ],
+    "platform": [
+      {
+        "name": "platform/web",
+        "description": "Web applications"
+      },
+      {
+        "name": "platform/mobile",
+        "description": "Mobile (iOS/Android)"
+      },
+    ],
+    "framework": [
+      {
+        "name": "framework/react",
+        "description": "React specific"
+      },
+      {
+        "name": "framework/vue",
+        "description": "Vue specific"
+      },
+      {
+        "name": "framework/angular",
+        "description": "Angular specific"
+      },
+      {
+        "name": "framework/react-native",
+        "description": "React Native specific"
+      },
+    ],
+    "satellite": [
+      {
+        "name": "satellite/yandex",
+        "color": "bfdadc",
+        "description": "Относится к yandex"
+      },
+      {
+        "name": "satellite/ozon",
+        "color": "d4c5f9",
+        "description": "Относится к ozon" 
+      },
+      {
+        "name": "satellite/wildberries",
+        "color": "d876e3",
+        "description": "Относится к wildberries" 
+      }
+    ]
+  },
+  "rules": {
+    "default_labels": ["status/needs-triage"],
+    "exclude_patterns": ["feature request", "улучшение", "enhancement request"],
+    "confidence_threshold": 2
+  }
 }
