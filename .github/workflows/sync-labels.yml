@@ -7,8 +7,7 @@ on:
     paths: ['.github/labels-config.json']
 
 jobs:
-
-  # Синхронизация в Hub (используем GITHUB_TOKEN)
+  # Синхронизация меток в Hub репозитории
   sync-hub-labels:
     runs-on: ubuntu-latest
     steps:
@@ -20,6 +19,12 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            
+            if (!fs.existsSync('./.github/labels-config.json')) {
+              console.log('❌ labels-config.json not found');
+              return;
+            }
+            
             const config = JSON.parse(fs.readFileSync('./.github/labels-config.json', 'utf8'));
             
             console.log('🔄 Syncing labels in Hub repository...');
@@ -83,7 +88,7 @@ jobs:
   # Синхронизация в Satellites (используем PAT)
   sync-satellite-labels:
     runs-on: ubuntu-latest
-    needs: [sync-hub-labels]
+    needs: sync-hub-labels
     strategy:
       matrix:
         satellite: ['yandex-test', 'ozon-test', 'wildberries-test']
@@ -97,21 +102,15 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const config = JSON.parse(fs.readFileSync('./.github/labels-config.json', 'utf8'));
             
-            // Создаем клиент с PAT для satellite операций
-            const patGithub = github.getOctokit('${{ secrets.SYNC_ACCESS_TOKEN }}');
-            
-            // Определяем owner и repo
-            let targetOwner, targetRepo;
-            if ('${{ matrix.satellite }}'.includes('/')) {
-              [targetOwner, targetRepo] = '${{ matrix.satellite }}'.split('/');
-            } else {
-              targetOwner = context.repo.owner;
-              targetRepo = '${{ matrix.satellite }}';
+            if (!fs.existsSync('./.github/labels-config.json')) {
+              console.log('❌ labels-config.json not found');
+              return;
             }
             
-            console.log(`🔄 Syncing labels to ${targetOwner}/${targetRepo}...`);
+            const config = JSON.parse(fs.readFileSync('./.github/labels-config.json', 'utf8'));
+            
+            console.log(`🔄 Syncing labels to ${{ matrix.satellite }}...`);
             
             // Получаем все метки из конфига
             const allLabels = [];
@@ -121,15 +120,21 @@ jobs:
               }
             }
             
-            console.log(`📋 Processing ${allLabels.length} labels for ${targetRepo}...`);
+            console.log(`📋 Processing ${allLabels.length} labels for ${{ matrix.satellite }}...`);
+            
+            // Правильное создание Octokit клиента с PAT
+            const { Octokit } = require('@octokit/rest');
+            const patOctokit = new Octokit({
+              auth: '${{ secrets.SYNC_ACCESS_TOKEN }}'
+            });
             
             try {
               // Получаем существующие метки в satellite
-              const existingLabels = await patGithub.paginate(
-                patGithub.rest.issues.listLabelsForRepo,
+              const existingLabels = await patOctokit.paginate(
+                patOctokit.rest.issues.listLabelsForRepo,
                 {
-                  owner: targetOwner,
-                  repo: targetRepo,
+                  owner: context.repo.owner,
+                  repo: '${{ matrix.satellite }}',
                   per_page: 100
                 }
               );
@@ -139,39 +144,37 @@ jobs:
               // Создаем или обновляем метки
               let created = 0;
               let updated = 0;
-              let errors = 0;
               
               for (const labelDef of allLabels) {
                 try {
                   if (existingLabelNames.includes(labelDef.name)) {
-                    await patGithub.rest.issues.updateLabel({
-                      owner: targetOwner,
-                      repo: targetRepo,
+                    await patOctokit.rest.issues.updateLabel({
+                      owner: context.repo.owner,
+                      repo: '${{ matrix.satellite }}',
                       name: labelDef.name,
                       color: labelDef.color,
                       description: labelDef.description || ''
                     });
                     updated++;
-                    console.log(`🔁 Updated in ${targetRepo}: ${labelDef.name}`);
+                    console.log(`🔁 Updated in ${{ matrix.satellite }}: ${labelDef.name}`);
                   } else {
-                    await patGithub.rest.issues.createLabel({
-                      owner: targetOwner,
-                      repo: targetRepo,
+                    await patOctokit.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: '${{ matrix.satellite }}',
                       name: labelDef.name,
                       color: labelDef.color,
                       description: labelDef.description || ''
                     });
                     created++;
-                    console.log(`✅ Created in ${targetRepo}: ${labelDef.name}`);
+                    console.log(`✅ Created in ${{ matrix.satellite }}: ${labelDef.name}`);
                   }
                 } catch (error) {
-                  errors++;
-                  console.log(`❌ Error with ${labelDef.name} in ${targetRepo}: ${error.message}`);
+                  console.log(`❌ Error with ${labelDef.name} in ${{ matrix.satellite }}: ${error.message}`);
                 }
               }
               
-              console.log(`🎉 ${targetRepo} sync completed! Created: ${created}, Updated: ${updated}, Errors: ${errors}`);
+              console.log(`🎉 ${{ matrix.satellite }} sync completed! Created: ${created}, Updated: ${updated}`);
               
             } catch (error) {
-              console.log(`💥 Failed to sync ${targetRepo}: ${error.message}`);
+              console.log(`💥 Failed to sync ${{ matrix.satellite }}: ${error.message}`);
             }
