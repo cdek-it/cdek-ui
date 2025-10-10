@@ -81,6 +81,65 @@
       "description": ">2 недель, архитектурные"
     },
     {
+      "name": "area/design-system",
+      "color": "e99695", 
+      "description": "Core дизайн-система"
+    },
+    {
+      "name": "area/components",
+      "color": "f9d71c", 
+      "description": "UI компоненты"
+    },
+    {
+      "name": "area/accessibility",
+      "color": "0e8a16", 
+      "description": "A11y и инклюзивность"
+    },
+    {
+      "name": "area/performance",
+      "color": "1d76db", 
+      "description": "Производительность"
+    },
+    {
+      "name": "area/tooling",
+      "color": "5319e7", 
+      "description": "Developer experience"
+    },
+    {
+      "name": "area/i18n",
+      "color": "fbca04", 
+      "description": "Интернационализация"
+    },
+    {
+      "name": "area/mobile",
+      "color": "d876e3", 
+      "description": "Мобильная разработка"
+    },
+    {
+      "name": "platform/web",
+      "description": "Web applications"
+    },
+    {
+      "name": "platform/mobile",
+      "description": "Mobile (iOS/Android)"
+    },
+    {
+      "name": "framework/react",
+      "description": "React specific"
+    },
+    {
+      "name": "framework/vue",
+      "description": "Vue specific"
+    },
+    {
+      "name": "framework/angular",
+      "description": "Angular specific"
+    },
+    {
+      "name": "framework/react-native",
+      "description": "React Native specific"
+    },
+    {
       "name": "satellite/yandex",
       "color": "bfdadc",
       "description": "Относится к yandex"
