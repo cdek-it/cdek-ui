@@ -4,44 +4,52 @@
       {
         "name": "type/bug",
         "color": "d73a4a", 
-        "description": "Исправление багов"
+        "description": "Исправление багов",
+        "keywords": ["bug", "fix", "error", "broken"]
       },
       {
         "name": "type/feature",
         "color": "a2eeef",
-        "description": "Новая функциональность"
+        "description": "Новая функциональность",
+        "keywords": ["feature", "add", "implement", "new"]
       },
       {
         "name": "type/enhancement",
         "color": "7057ff",
-        "description": "Улучшение существующего"
+        "description": "Улучшение существующего",
+        "keywords": ["improve", "enhance", "optimize"]
       },
       {
         "name": "type/refactor",
         "color": "fbca04",
-        "description": "Рефакторинг без изменения API"
+        "description": "Рефакторинг без изменения API",
+        "keywords": ["refactor", "cleanup", "restructure"]
       },
       {
         "name": "type/documentation",
         "color": "0075ca",
-        "description": "Документация"
+        "description": "Документация",
+        "keywords": ["docs"]
       },
       {
         "name": "type/testing",
         "color": "1d76db",
-        "description": "Тесты и QA"
+        "description": "Тесты и QA",
+        "keywords": ["test"]
       },
       {
         "name": "type/ci-cd",
         "color": "0e8a16",
-        "description": "CI/CD и автоматизация"
+        "description": "CI/CD и автоматизация",
+        "keywords": ["ci", "build"]
       }
     ],
     "priority": [
       {
         "name": "priority/critical", 
         "color": "b60205",
-        "description": "Блокирующие производство"
+        "description": "Блокирующие производство",
+        "keywords": ["critical", "blocking", "production", "urgent"]
       },
       {
         "name": "priority/high",
@@ -56,7 +64,8 @@
       {
         "name": "priority/low",
         "color": "0e8a16", 
-        "description": "Nice-to-have"
+        "description": "Nice-to-have",
+        "keywords": ["minor", "cosmetic", "nice-to-have"]
       }
     ],
     "effort": [
@@ -149,6 +158,33 @@
       {
         "name": "framework/react-native",
         "description": "React Native specific"
+      }
+    ],
+    "status": [
+      {
+        "name": "status/needs-triage",
+        "color": "d4c5f9",
+        "description": "Требует первичного review"
+      },
+      {
+        "name": "status/ready-for-dev",
+        "color": "0e8a16",
+        "description": "Готово к разработке"
+      },
+      {
+        "name": "status/in-progress",
+        "color": "1d76db",
+        "description": "В разработке"
+      },
+      {
+        "name": "status/needs-review",
+        "color": "fbca04",
+        "description": "Ожидает code review"
+      },
+      {
+        "name": "status/blocked",
+        "color": "b60205",
+        "description": "Заблокировано"
       }
     ],
     "satellite": [
