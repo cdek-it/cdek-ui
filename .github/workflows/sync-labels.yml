@@ -178,26 +178,26 @@ jobs:
             
             const report = `# 🏷️ Labels Synchronization Report
 
-**Generated**: ${new Date().toLocaleString()}
-**Triggered by**: ${context.payload.head_commit ? 'Code push' : 'Manual trigger'}
-
-## 📊 Sync Status
-
-### Hub Repository
-- ✅ Labels synchronized successfully
-- Repository: ${context.repo.owner}/${context.repo.repo}
-
-### Satellite Repositories
-${satellites.map(satellite => `
-#### ${satellite}
-- ✅ Labels synchronized successfully
-- Repository: ${context.repo.owner}/${satellite}
-`).join('')}
-
-## 🔄 Next Steps
-- All labels are now consistent across all repositories
-- New issues will use the synchronized labels
-- To modify labels, update \`.github/labels-config.json\` in Hub
+            **Generated**: ${now}
+            **Triggered by**: ${context.payload.head_commit ? 'Code push' : 'Manual trigger'}
+            
+            ## 📊 Sync Status
+            
+            ### Hub Repository
+            - ✅ Labels synchronized successfully
+            - Repository: ${context.repo.owner}/${context.repo.repo}
+            
+            ### Satellite Repositories
+            ${satellites.map(satellite => `
+            #### ${satellite}
+            - ✅ Labels synchronized successfully
+            - Repository: ${context.repo.owner}/${satellite}
+            `).join('')}
+            
+            ## 🔄 Next Steps
+            - All labels are now consistent across all repositories
+            - New issues will use the synchronized labels
+            - To modify labels, update \`.github/labels-config.json\` in Hub
 
 ---
 
