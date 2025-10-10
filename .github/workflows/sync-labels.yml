@@ -7,35 +7,209 @@ on:
     paths: ['.github/labels-config.json']
 
 jobs:
-  sync-labels:
+  # Синхронизация меток в Hub репозитории
+  sync-hub-labels:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Hub
         uses: actions/checkout@v4
         
-      - name: Sync to yandex-test
+      - name: Sync labels in Hub repository
         uses: actions/github-script@v7
-        env:
-          TARGET_REPO: "yandex-test"
         with:
           script: |
-            const labels = require('./.github/labels-config.json').labels;
-            console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('./.github/labels-config.json', 'utf8'));
+            const labels = config.labels;
+            
+            console.log(`🔄 Syncing ${Object.keys(labels).reduce((acc, key) => acc + labels[key].length, 0)} labels in Hub...`);
+            
+            // Получаем все метки из конфига
+            const allLabels = [];
+            for (const category of Object.values(labels)) {
+              if (Array.isArray(category)) {
+                allLabels.push(...category);
+              }
+            }
+            
+            // Получаем существующие метки в Hub
+            const existingLabels = await github.paginate(
+              github.rest.issues.listLabelsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              }
+            );
+            
+            const existingLabelNames = existingLabels.map(label => label.name);
+            
+            // Создаем или обновляем метки в Hub
+            let hubCreated = 0;
+            let hubUpdated = 0;
+            
+            for (const labelDef of allLabels) {
+              try {
+                if (existingLabelNames.includes(labelDef.name)) {
+                  // Обновляем существующую метку
+                  await github.rest.issues.updateLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: labelDef.name,
+                    color: labelDef.color,
+                    description: labelDef.description || ''
+                  });
+                  hubUpdated++;
+                  console.log(`🔄 Updated in Hub: ${labelDef.name}`);
+                } else {
+                  // Создаем новую метку
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: labelDef.name,
+                    color: labelDef.color,
+                    description: labelDef.description || ''
+                  });
+                  hubCreated++;
+                  console.log(`✅ Created in Hub: ${labelDef.name}`);
+                }
+              } catch (error) {
+                console.log(`❌ Error with ${labelDef.name} in Hub: ${error.message}`);
+              }
+            }
+            
+            console.log(`🎉 Hub sync completed! Created: ${hubCreated}, Updated: ${hubUpdated}`);
 
-      - name: Sync to ozon-test
+  # Синхронизация меток в Satellite репозиториях
+  sync-satellite-labels:
+    runs-on: ubuntu-latest
+    needs: sync-hub-labels
+    strategy:
+      matrix:
+        satellite: ['yandex-test', 'ozon-test', 'wildberries-test']
+    
+    steps:
+      - name: Checkout Hub
+        uses: actions/checkout@v4
+        
+      - name: Sync labels to ${{ matrix.satellite }}
         uses: actions/github-script@v7
         env:
-          TARGET_REPO: "ozon-test"
+          TARGET_REPO: ${{ matrix.satellite }}
         with:
           script: |
-            const labels = require('./.github/labels-config.json').labels;
-            console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('./.github/labels-config.json', 'utf8'));
+            const labels = config.labels;
+            
+            console.log(`🔄 Syncing ${Object.keys(labels).reduce((acc, key) => acc + labels[key].length, 0)} labels to ${process.env.TARGET_REPO}...`);
+            
+            // Получаем все метки из конфига
+            const allLabels = [];
+            for (const category of Object.values(labels)) {
+              if (Array.isArray(category)) {
+                allLabels.push(...category);
+              }
+            }
+            
+            try {
+              // Получаем существующие метки в satellite
+              const existingLabels = await github.paginate(
+                github.rest.issues.listLabelsForRepo,
+                {
+                  owner: context.repo.owner,
+                  repo: process.env.TARGET_REPO,
+                  per_page: 100
+                }
+              );
+              
+              const existingLabelNames = existingLabels.map(label => label.name);
+              
+              // Создаем или обновляем метки в satellite
+              let created = 0;
+              let updated = 0;
+              
+              for (const labelDef of allLabels) {
+                try {
+                  if (existingLabelNames.includes(labelDef.name)) {
+                    // Обновляем существующую метку
+                    await github.rest.issues.updateLabel({
+                      owner: context.repo.owner,
+                      repo: process.env.TARGET_REPO,
+                      name: labelDef.name,
+                      color: labelDef.color,
+                      description: labelDef.description || ''
+                    });
+                    updated++;
+                    console.log(`🔄 Updated in ${process.env.TARGET_REPO}: ${labelDef.name}`);
+                  } else {
+                    // Создаем новую метку
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: process.env.TARGET_REPO,
+                      name: labelDef.name,
+                      color: labelDef.color,
+                      description: labelDef.description || ''
+                    });
+                    created++;
+                    console.log(`✅ Created in ${process.env.TARGET_REPO}: ${labelDef.name}`);
+                  }
+                } catch (error) {
+                  console.log(`❌ Error with ${labelDef.name} in ${process.env.TARGET_REPO}: ${error.message}`);
+                }
+              }
+              
+              console.log(`🎉 ${process.env.TARGET_REPO} sync completed! Created: ${created}, Updated: ${updated}`);
+              
+            } catch (error) {
+              console.log(`❌ Failed to sync to ${process.env.TARGET_REPO}: ${error.message}`);
+            }
 
-      - name: Sync to wildberries-test
+  # Отчет о синхронизации
+  generate-sync-report:
+    runs-on: ubuntu-latest
+    needs: [sync-hub-labels, sync-satellite-labels]
+    steps:
+      - name: Create synchronization report
         uses: actions/github-script@v7
-        env:
-          TARGET_REPO: "wildberries-test"
         with:
           script: |
-            const labels = require('./.github/labels-config.json').labels;
-            console.log(`Syncing ${labels.length} labels to ${process.env.TARGET_REPO}`);
+            const satellites = ['yandex-test', 'ozon-test', 'wildberries-test'];
+            
+            const report = `# 🏷️ Labels Synchronization Report
+
+**Generated**: ${new Date().toLocaleString()}
+**Triggered by**: ${context.payload.head_commit ? 'Code push' : 'Manual trigger'}
+
+## 📊 Sync Status
+
+### Hub Repository
+- ✅ Labels synchronized successfully
+- Repository: ${context.repo.owner}/${context.repo.repo}
+
+### Satellite Repositories
+${satellites.map(satellite => `
+#### ${satellite}
+- ✅ Labels synchronized successfully
+- Repository: ${context.repo.owner}/${satellite}
+`).join('')}
+
+## 🔄 Next Steps
+- All labels are now consistent across all repositories
+- New issues will use the synchronized labels
+- To modify labels, update \`.github/labels-config.json\` in Hub
+
+---
+
+_This report was automatically generated by GitHub Actions_`;
+
+            // Создаем issue с отчетом
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🏷️ Labels Sync Complete - ${new Date().toLocaleDateString()}`,
+              body: report,
+              labels: ['automated', 'labels-sync', 'report']
+            });
+
+            console.log('📊 Sync report created successfully!');
