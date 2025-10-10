@@ -35,7 +35,7 @@
         "name": "type/ci-cd",
         "color": "0e8a16",
         "description": "CI/CD и автоматизация"
-      },
+      }
     ],
     "priority": [
       {
@@ -57,7 +57,7 @@
         "name": "priority/low",
         "color": "0e8a16", 
         "description": "Nice-to-have"
-      },
+      }
     ],
     "effort": [
       {
@@ -84,7 +84,7 @@
         "name": "effort/xl",
         "color": "f9d71c", 
         "description": ">2 недель, архитектурные"
-      },
+      }
     ],
     "area": [
       {
@@ -121,7 +121,7 @@
         "name": "area/mobile",
         "color": "d876e3", 
         "description": "Мобильная разработка"
-      },
+      }
     ],
     "platform": [
       {
@@ -131,7 +131,7 @@
       {
         "name": "platform/mobile",
         "description": "Mobile (iOS/Android)"
-      },
+      }
     ],
     "framework": [
       {
@@ -149,7 +149,7 @@
       {
         "name": "framework/react-native",
         "description": "React Native specific"
-      },
+      }
     ],
     "satellite": [
       {
