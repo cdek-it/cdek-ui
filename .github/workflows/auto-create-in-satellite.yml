@@ -54,7 +54,7 @@ jobs:
                 // Используем PAT для доступа к satellite
                 const { Octokit } = require('@octokit/rest');
                 const octokit = new Octokit({
-                  auth: '${{ secrets.SYNC_ACCESS_TOKEN }}'
+                  auth: '${{ secrets.ADD_TO_PROJECT_PAT }}'
                 });
                 
                 // Создаем issue в satellite
