@@ -19,14 +19,11 @@ jobs:
           script: |
             const { issue, label } = context.payload;
             
-            // Проверяем что это satellite метка
             if (!label.name.startsWith('satellite/')) return;
             
             const satelliteName = label.name.replace('satellite/', '');
+            console.log('🔄 Auto-creating issue in satellite: ' + satelliteName);
             
-            console.log(`🔄 Auto-creating issue in satellite: ${satelliteName}`);
-            
-            // Проверяем что задача еще не создана в satellite
             const hasRoutedLabel = issue.labels.some(l => l.name === 'status/routed');
             if (hasRoutedLabel) {
               console.log('ℹ️ Issue already routed to satellite, skipping');
@@ -37,7 +34,6 @@ jobs:
             
             async function createSatelliteIssue(hubIssue, satelliteName) {
               try {
-                // Маппинг satellites на репозитории
                 const repoMap = {
                   'yandex-test': 'yandex-test',
                   'ozon-test': 'ozon-test',
@@ -45,90 +41,74 @@ jobs:
                 };
                 
                 const targetRepo = repoMap[satelliteName];
-                
                 if (!targetRepo) {
-                  console.log(`❌ Unknown satellite: ${satelliteName}`);
+                  console.log('❌ Unknown satellite: ' + satelliteName);
                   return;
                 }
                 
-                // Используем PAT для доступа к satellite
                 const { Octokit } = require('@octokit/rest');
                 const octokit = new Octokit({
-                  auth: '${{ secrets.ADD_TO_PROJECT_PAT }}'
+                  auth: '${{ secrets.SYNC_ACCESS_TOKEN }}'
                 });
                 
-                // Создаем issue в satellite
                 const satelliteIssue = await octokit.rest.issues.create({
                   owner: context.repo.owner,
                   repo: targetRepo,
-                  title: `[From Hub] ${hubIssue.title}`,
-                  body: `## 📡 Задача создана из Hub
-                  
-                **Original Issue**: #${hubIssue.number}
-                **Hub URL**: ${hubIssue.html_url}
-                **Created By**: @${hubIssue.user.login}
-                **Satellite**: ${satelliteName}
-                **Auto-created**: ${new Date().toISOString()}
-
-                ---
+                  title: '[From Hub] ' + hubIssue.title,
+                  body: '## 📡 Задача создана из Hub\n\n' +
+                        '**Original Issue**: #' + hubIssue.number + '\n' +
+                        '**Hub URL**: ' + hubIssue.html_url + '\n' +
+                        '**Created By**: @' + hubIssue.user.login + '\n' +
+                        '**Satellite**: ' + satelliteName + '\n' +
+                        '**Auto-created**: ' + new Date().toISOString() + '\n\n' +
+                        '---\n\n' +
+                        hubIssue.body + '\n\n' +
+                        '---\n\n' +
+                        '### 🔗 Связь с Hub\n' +
+                        '- Все обсуждения и планирование в [Hub Issue #' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
+                        '- Код и реализация в этом репозитории\n' +
+                        '- При создании PR ссылайтесь на эту задачу\n' +
+                        '- Статус синхронизируется автоматически',
+                  labels: ['from-hub', 'needs-triage']
+                });
                 
-                ${hubIssue.body}
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: hubIssue.number,
+                  name: 'status/needs-routing'
+                });
                 
-                ---
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: hubIssue.number,
+                  labels: ['status/routed', 'auto-created']
+                });
                 
-                # ### 🔗 Связь с Hub
-                # - Все обсуждения и планирование в [Hub Issue #${hubIssue.number}](${hubIssue.html_url})
-                # - Код и реализация в этом репозитории
-                # - При создании PR ссылайтесь на эту задачу
-                # - Статус синхронизируется автоматически
-                #   `,
-                #   labels: ['from-hub', 'needs-triage']
-                # });
-                
-                # // Обновляем метки в Hub
-                # await github.rest.issues.removeLabel({
-                #   owner: context.repo.owner,
-                #   repo: context.repo.repo,
-                #   issue_number: hubIssue.number,
-                #   name: 'status/needs-routing'
-                # });
-                
-                # await github.rest.issues.addLabels({
-                #   owner: context.repo.owner,
-                #   repo: context.repo.repo,
-                #   issue_number: hubIssue.number,
-                #   labels: ['status/routed', 'auto-created']
-                # });
-                
-                // Добавляем комментарий с ссылкой
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: hubIssue.number,
-                  body: `✅ **Задача автоматически создана в satellite!**
-                  
-                **Satellite**: \`${targetRepo}\`
-                **Issue**: [#${satelliteIssue.data.number}](${satelliteIssue.data.html_url})
-                **Auto-created**: ${new Date().toLocaleString()}
+                  body: '✅ **Задача автоматически создана в satellite!**\n\n' +
+                        '**Satellite**: `' + targetRepo + '`\n' +
+                        '**Issue**: [#' + satelliteIssue.data.number + '](' + satelliteIssue.data.html_url + ')\n' +
+                        '**Auto-created**: ' + new Date().toLocaleString() + '\n\n' +
+                        '**Статус**: 🟢 Активно в satellite'
+                });
                 
-                **Статус**: 🟢 Активно в satellite`
-                                });
-                
-                console.log(`✅ Created issue in ${targetRepo}: #${satelliteIssue.data.number}`);
+                console.log('✅ Created issue in ' + targetRepo + ': #' + satelliteIssue.data.number);
                 
               } catch (error) {
-                console.log(`❌ Failed to create in ${satelliteName}: ${error.message}`);
+                console.log('❌ Failed to create in ' + satelliteName + ': ' + error.message);
                 
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: hubIssue.number,
-                  body: `❌ **Ошибка автосоздания в satellite**
-                  
-              Не удалось создать задачу в satellite \`${satelliteName}\`:
-              \`\`\`
-              ${error.message}
-              \`\`\``
+                  body: '❌ **Ошибка автосоздания в satellite**\n\n' +
+                        'Не удалось создать задачу в satellite `' + satelliteName + '`:\n' +
+                        '```\n' + error.message + '\n```'
                 });
               }
             }
