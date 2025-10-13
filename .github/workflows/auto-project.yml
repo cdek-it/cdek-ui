@@ -16,6 +16,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+
     steps:
       - name: Add to project
         if: github.event.action == 'opened'
@@ -25,25 +26,43 @@ jobs:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
 
+      - name: Get project item id
+        id: item
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          node_id="${{ github.event.issue.node_id || github.event.pull_request.node_id }}"
+          item_id=$(gh api graphql -f query='
+            query($org:String!, $project:Int!, $nodeId:ID!) {
+              organization(login:$org){
+                projectV2(number:$project){
+                  items(first:100){
+                    nodes{ id content{ ... on Issue{ id } ... on PullRequest{ id } } }
+                  }
+                }
+              }
+            }' -F org=cdek-it -F project=2 -F nodeId="$node_id" \
+            --jq '.data.organization.projectV2.items.nodes[] | select(.content.id == $nodeId) | .id')
+          echo "itemId=$item_id" >> $GITHUB_OUTPUT
+
       - name: Set Status = OPEN
         if: github.event.action == 'opened'
         uses: titoportas/update-project-fields@v0.1.0
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          item-id: ${{ steps.add.outputs.itemId }}
+          item-id: ${{ steps.add.outputs.itemId || steps.item.outputs.itemId }}
           field-keys: Status
           field-values: OPEN
 
-      - name: Move to TO-DO  (label status/in-progress)
+      - name: Move to TO-DO
         if: |
-          github.event.action == 'assigned' ||
           (github.event.action == 'labeled' && github.event.label.name == 'status/in-progress')
         uses: titoportas/update-project-fields@v0.1.0
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          item-id: ${{ steps.add.outputs.itemId }}
+          item-id: ${{ steps.item.outputs.itemId }}
           field-keys: Status
           field-values: TO-DO
 
@@ -53,7 +72,7 @@ jobs:
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          item-id: ${{ steps.add.outputs.itemId }}
+          item-id: ${{ steps.item.outputs.itemId }}
           field-keys: Status
           field-values: CLOSED
 
@@ -63,6 +82,6 @@ jobs:
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          item-id: ${{ steps.add.outputs.itemId }}
+          item-id: ${{ steps.item.outputs.itemId }}
           field-keys: Status
           field-values: BLOCKED
