@@ -1,0 +1,90 @@
+name: Auto-assign by label
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, labeled, reopened, synchronize]
+
+jobs:
+  assign-by-label:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Assign issue or PR based on label
+        uses: actions/github-script@v7
+        with:
+          # можно использовать либо GITHUB_TOKEN, либо свой PAT
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+
+            // Загружаем labels-config.json
+            const labelsPath = path.join(process.env.GITHUB_WORKSPACE, ".github", "labels-config.json");
+            const configData = JSON.parse(fs.readFileSync(labelsPath, "utf8"));
+
+            // Маппинг метка → команда (slug)
+            const labelToTeam = {
+              "area/design-system": "design-team",
+              "area/components": "frontend-specialists",
+              "area/accessibility": "a11y-experts",
+              "area/performance": "performance-team",
+              "area/tooling": "devops-team",
+              "area/i18n": "i18n-team",
+              "area/mobile": "mobile-team"
+            };
+
+            // Определяем, что именно вызвало Action — Issue или PR
+            const isIssue = !!context.payload.issue;
+            const item = isIssue ? context.payload.issue : context.payload.pull_request;
+            const number = item.number;
+            const labels = item.labels.map(l => l.name);
+            const org = context.repo.owner;
+
+            console.log(`🟢 Обработка ${isIssue ? "Issue" : "Pull Request"} #${number}`);
+
+            // Проверяем, какие метки присутствуют
+            const validLabels = Object.values(configData).flat().map(l => l.name);
+            const matchingLabels = labels.filter(label => validLabels.includes(label));
+
+            if (matchingLabels.length === 0) {
+              console.log("❌ Нет меток, соответствующих конфигу.");
+              return;
+            }
+
+            for (const label of matchingLabels) {
+              const teamSlug = labelToTeam[label];
+              if (!teamSlug) {
+                console.log(`⚠️ Для метки '${label}' нет команды`);
+                continue;
+              }
+
+              console.log(`✅ Найдена команда: ${teamSlug} для метки ${label}`);
+
+              // Получаем участников команды
+              const members = await github.paginate(
+                github.teams.listMembersInOrg,
+                { org, team_slug: teamSlug }
+              );
+
+              const assignees = members.map(m => m.login);
+              if (assignees.length === 0) {
+                console.log(`⚠️ В команде ${teamSlug} нет участников.`);
+                continue;
+              }
+
+              // Назначаем участников
+              const params = {
+                owner: org,
+                repo: context.repo.repo,
+                issue_number: number,
+                assignees
+              };
+
+              await github.issues.addAssignees(params);
+              console.log(`🎯 Назначено на: ${assignees.join(", ")}`);
+            }
