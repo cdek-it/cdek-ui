@@ -13,6 +13,15 @@ jobs:
       - name: Checkout Hub
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install @octokit/rest
+
       - name: Auto create issue in satellite
         uses: actions/github-script@v7
         with:
@@ -46,12 +55,8 @@ jobs:
                   return;
                 }
                 
-                const { Octokit } = require('@octokit/rest');
-                const octokit = new Octokit({
-                  auth: '${{ secrets.SYNC_ACCESS_TOKEN }}'
-                });
-                
-                const satelliteIssue = await octokit.rest.issues.create({
+                // Используем встроенный github из контекста вместо octokit
+                const satelliteIssue = await github.rest.issues.create({
                   owner: context.repo.owner,
                   repo: targetRepo,
                   title: '[From Hub] ' + hubIssue.title,
