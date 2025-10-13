@@ -72,7 +72,7 @@ jobs:
                           '- Код и реализация в этом репозитории\n' +
                           '- При создании PR ссылайтесь на эту задачу\n' +
                           '- Статус синхронизируется автоматически',
-                    labels: ['from-hub', 'needs-triage']
+                    labels: ['status/from-hub', 'status/needs-triage']
                   })
                 });
                 
@@ -93,7 +93,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: hubIssue.number,
-                  labels: ['status/routed', 'auto-created']
+                  labels: ['status/routed', 'status/auto-created']
                 });
                 
                 await github.rest.issues.createComment({
