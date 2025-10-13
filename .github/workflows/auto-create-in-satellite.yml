@@ -13,17 +13,10 @@ jobs:
       - name: Checkout Hub
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install @octokit/rest
-
       - name: Auto create issue in satellite
         uses: actions/github-script@v7
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_ACCESS_TOKEN }}
         with:
           script: |
             const { issue, label } = context.payload;
@@ -55,27 +48,39 @@ jobs:
                   return;
                 }
                 
-                // Используем встроенный github из контекста вместо octokit
-                const satelliteIssue = await github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: targetRepo,
-                  title: '[From Hub] ' + hubIssue.title,
-                  body: '## 📡 Задача создана из Hub\n\n' +
-                        '**Original Issue**: #' + hubIssue.number + '\n' +
-                        '**Hub URL**: ' + hubIssue.html_url + '\n' +
-                        '**Created By**: @' + hubIssue.user.login + '\n' +
-                        '**Satellite**: ' + satelliteName + '\n' +
-                        '**Auto-created**: ' + new Date().toISOString() + '\n\n' +
-                        '---\n\n' +
-                        hubIssue.body + '\n\n' +
-                        '---\n\n' +
-                        '### 🔗 Связь с Hub\n' +
-                        '- Все обсуждения и планирование в [Hub Issue #' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
-                        '- Код и реализация в этом репозитории\n' +
-                        '- При создании PR ссылайтесь на эту задачу\n' +
-                        '- Статус синхронизируется автоматически',
-                  labels: ['from-hub', 'needs-triage']
+                // Используем fetch для создания issue
+                const response = await fetch(`https://api.github.com/repos/${context.repo.owner}/${targetRepo}/issues`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `token ${process.env.SYNC_TOKEN}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/vnd.github.v3+json'
+                  },
+                  body: JSON.stringify({
+                    title: '[From Hub] ' + hubIssue.title,
+                    body: '## 📡 Задача создана из Hub\n\n' +
+                          '**Original Issue**: #' + hubIssue.number + '\n' +
+                          '**Hub URL**: ' + hubIssue.html_url + '\n' +
+                          '**Created By**: @' + hubIssue.user.login + '\n' +
+                          '**Satellite**: ' + satelliteName + '\n' +
+                          '**Auto-created**: ' + new Date().toISOString() + '\n\n' +
+                          '---\n\n' +
+                          hubIssue.body + '\n\n' +
+                          '---\n\n' +
+                          '### 🔗 Связь с Hub\n' +
+                          '- Все обсуждения и планирование в [Hub Issue #' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
+                          '- Код и реализация в этом репозитории\n' +
+                          '- При создании PR ссылайтесь на эту задачу\n' +
+                          '- Статус синхронизируется автоматически',
+                    labels: ['from-hub', 'needs-triage']
+                  })
                 });
+                
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status} - ${await response.text()}`);
+                }
+                
+                const satelliteIssue = await response.json();
                 
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
@@ -97,12 +102,12 @@ jobs:
                   issue_number: hubIssue.number,
                   body: '✅ **Задача автоматически создана в satellite!**\n\n' +
                         '**Satellite**: `' + targetRepo + '`\n' +
-                        '**Issue**: [#' + satelliteIssue.data.number + '](' + satelliteIssue.data.html_url + ')\n' +
+                        '**Issue**: [#' + satelliteIssue.number + '](' + satelliteIssue.html_url + ')\n' +
                         '**Auto-created**: ' + new Date().toLocaleString() + '\n\n' +
                         '**Статус**: 🟢 Активно в satellite'
                 });
                 
-                console.log('✅ Created issue in ' + targetRepo + ': #' + satelliteIssue.data.number);
+                console.log('✅ Created issue in ' + targetRepo + ': #' + satelliteIssue.number);
                 
               } catch (error) {
                 console.log('❌ Failed to create in ' + satelliteName + ': ' + error.message);
