@@ -185,24 +185,21 @@
         "name": "status/blocked",
         "color": "b60205",
         "description": "Заблокировано"
-      },
+      }
+    ],
+      "states" [
       {
-        "name": "status/routed",
+        "name": "state/routed",
         "color": "b60205",
         "description": "Routed to satellit"
       },
       {
-        "name": "status/from-hub",
+        "name": "state/from-hub",
         "color": "b60205",
         "description": "Issue from hub"
       },
       {
-        "name": "status/needs-routing",
-        "color": "b60205",
-        "description": "Need rout from hub to satellit"
-      },
-      {
-        "name": "status/auto-created",
+        "name": "state/auto-created",
         "color": "b60205",
         "description": "Issue auto created"
       }
