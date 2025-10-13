@@ -16,7 +16,6 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-
     steps:
       - name: Add to project
         if: github.event.action == 'opened'
@@ -33,19 +32,20 @@ jobs:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
           item-id: ${{ steps.add.outputs.itemId }}
-          field: Status
-          field-value: OPEN
+          field-keys: Status
+          field-values: OPEN
 
-      - name: Move to TO-DO
+      - name: Move to TO-DO  (label status/in-progress)
         if: |
           github.event.action == 'assigned' ||
-          (github.event.action == 'labeled' && github.event.label.name == 'accepted')
+          (github.event.action == 'labeled' && github.event.label.name == 'status/in-progress')
         uses: titoportas/update-project-fields@v0.1.0
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          field: Status
-          field-value: TO-DO
+          item-id: ${{ steps.add.outputs.itemId }}
+          field-keys: Status
+          field-values: TO-DO
 
       - name: Move to CLOSED
         if: github.event.action == 'closed'
@@ -53,8 +53,9 @@ jobs:
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          field: Status
-          field-value: CLOSED
+          item-id: ${{ steps.add.outputs.itemId }}
+          field-keys: Status
+          field-values: CLOSED
 
       - name: Move to BLOCKED
         if: github.event.action == 'labeled' && github.event.label.name == 'blocked'
@@ -62,5 +63,6 @@ jobs:
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          field: Status
-          field-value: BLOCKED
+          item-id: ${{ steps.add.outputs.itemId }}
+          field-keys: Status
+          field-values: BLOCKED
