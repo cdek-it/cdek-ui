@@ -189,17 +189,17 @@
     ],
     "satellite": [
       {
-        "name": "satellite/yandex",
+        "name": "satellite/yandex-test",
         "color": "bfdadc",
         "description": "Относится к yandex"
       },
       {
-        "name": "satellite/ozon",
+        "name": "satellite/ozon-test",
         "color": "d4c5f9",
         "description": "Относится к ozon" 
       },
       {
-        "name": "satellite/wildberries",
+        "name": "satellite/wildberries-test",
         "color": "d876e3",
         "description": "Относится к wildberries" 
       }
