@@ -33,16 +33,22 @@ jobs:
         run: |
           node_id="${{ github.event.issue.node_id || github.event.pull_request.node_id }}"
           item_id=$(gh api graphql -f query='
-            query($org:String!, $project:Int!, $nodeId:ID!) {
+            query($org:String!, $project:Int!) {
               organization(login:$org){
                 projectV2(number:$project){
                   items(first:100){
-                    nodes{ id content{ ... on Issue{ id } ... on PullRequest{ id } } }
+                    nodes{
+                      id
+                      content{
+                        ... on Issue   { id }
+                        ... on PullRequest { id }
+                      }
+                    }
                   }
                 }
               }
-            }' -F org=cdek-it -F project=2 -F nodeId="$node_id" \
-            --jq '.data.organization.projectV2.items.nodes[] | select(.content.id == $nodeId) | .id')
+            }' -F org=cdek-it -F project=2 \
+            --jq ".data.organization.projectV2.items.nodes[] | select(.content.id == \"$node_id\") | .id")
           echo "itemId=$item_id" >> $GITHUB_OUTPUT
 
       - name: Set Status = OPEN
