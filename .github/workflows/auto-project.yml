@@ -1,0 +1,66 @@
+name: Auto Kanban
+
+on:
+  issues:
+    types: [opened, closed, assigned, labeled]
+  pull_request:
+    types: [opened, closed, assigned, labeled]
+
+env:
+  PROJECT_URL: https://github.com/orgs/cdek-it/projects/2
+
+jobs:
+  add-or-move:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Add to project
+        if: github.event.action == 'opened'
+        id: add
+        uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
+      - name: Set Status = OPEN
+        if: github.event.action == 'opened'
+        uses: titoportas/update-project-fields@v0.1.0
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          item-id: ${{ steps.add.outputs.itemId }}
+          field: Status
+          field-value: OPEN
+
+      - name: Move to TO-DO
+        if: |
+          github.event.action == 'assigned' ||
+          (github.event.action == 'labeled' && github.event.label.name == 'accepted')
+        uses: titoportas/update-project-fields@v0.1.0
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          field: Status
+          field-value: TO-DO
+
+      - name: Move to CLOSED
+        if: github.event.action == 'closed'
+        uses: titoportas/update-project-fields@v0.1.0
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          field: Status
+          field-value: CLOSED
+
+      - name: Move to BLOCKED
+        if: github.event.action == 'labeled' && github.event.label.name == 'blocked'
+        uses: titoportas/update-project-fields@v0.1.0
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          field: Status
+          field-value: BLOCKED
