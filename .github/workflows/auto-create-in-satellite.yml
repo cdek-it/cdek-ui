@@ -26,7 +26,7 @@ jobs:
             const satelliteName = label.name.replace('satellite/', '');
             console.log('🔄 Auto-creating issue in satellite: ' + satelliteName);
             
-            const hasRoutedLabel = issue.labels.some(l => l.name === 'status/routed');
+            const hasRoutedLabel = issue.labels.some(l => l.name === 'state/routed');
             if (hasRoutedLabel) {
               console.log('ℹ️ Issue already routed to satellite, skipping');
               return;
@@ -79,7 +79,7 @@ jobs:
                           '- Код и реализация в этом репозитории\n' +
                           '- При создании PR ссылайтесь на эту задачу\n' +
                           '- Статус синхронизируется автоматически',
-                    labels: ['status/from-hub', 'status/needs-triage', ...labelsToSync]
+                    labels: ['state/from-hub', 'status/needs-triage', ...labelsToSync]
                   })
                 });
                 
