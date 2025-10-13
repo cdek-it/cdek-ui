@@ -1,4 +1,4 @@
-name: Auto-assign by label from JSON
+name: Auto-assign by label
 
 on:
   issues:
