@@ -1,18 +1,18 @@
 {
   "satellites": {
-    "yandex": {
+    "yandex-test": {
       "type": "application",
       "description": "Yandex",
       "url": "https://github.com/cdek-it/yandex-test",
       "team": "frontend"
     },
-    "ozon": {
+    "ozon-test": {
       "type": "service", 
       "description": "Ozon",
       "url": "https://github.com/cdek-it/ozon-test",
       "team": "backend"
     },
-    "wildberries": {
+    "wildberries-test": {
       "type": "application",
       "description": "Wildberries", 
       "url": "https://github.com/cdek-it/wildberries-test",
