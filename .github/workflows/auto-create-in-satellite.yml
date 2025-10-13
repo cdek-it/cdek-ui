@@ -51,10 +51,7 @@ jobs:
                 const labelsToSync = hubIssue.labels
                   .map(l => l.name)
                   .filter(labelName => 
-                    !labelName.startsWith('status/') &&
-                    !labelName.startsWith('area/') &&
-                    !labelName.startsWith('priority/') &&
-                    !labelName.startsWith('type/') &&
+                    !labelName.startsWith('satellite/') &&
                     labelName !== 'status/need-triage'
                   );
                 
