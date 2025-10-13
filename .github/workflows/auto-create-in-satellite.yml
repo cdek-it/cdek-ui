@@ -47,6 +47,16 @@ jobs:
                   console.log('❌ Unknown satellite: ' + satelliteName);
                   return;
                 }
+
+                const labelsToSync = hubIssue.labels
+                  .map(l => l.name)
+                  .filter(labelName => 
+                    !labelName.startsWith('status/') &&
+                    !labelName.startsWith('area/') &&
+                    !labelName.startsWith('priority/') &&
+                    !labelName.startsWith('type/') &&
+                    labelName !== 'status/need-triage'
+                  );
                 
                 // Используем fetch для создания issue
                 const response = await fetch(`https://api.github.com/repos/${context.repo.owner}/${targetRepo}/issues`, {
@@ -72,7 +82,7 @@ jobs:
                           '- Код и реализация в этом репозитории\n' +
                           '- При создании PR ссылайтесь на эту задачу\n' +
                           '- Статус синхронизируется автоматически',
-                    labels: ['status/from-hub', 'status/needs-triage']
+                    labels: ['status/from-hub', 'status/needs-triage', ...labelsToSync]
                   })
                 });
                 
