@@ -86,7 +86,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: hubIssue.number,
-                  labels: ['status/routed', 'status/auto-created']
+                  labels: ['status/routed']
                 });
                 
                 await github.rest.issues.createComment({
