@@ -48,13 +48,6 @@ jobs:
               return;
             }
             
-            // Ищем номер Satellite issue в описании
-            const satelliteIssueMatch = issue.body.match(/Satellite Issue.*#(\d+)/);
-            if (!satelliteIssueMatch) {
-              console.log('❌ Satellite issue reference not found');
-              return;
-            }
-            
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
             const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
             
