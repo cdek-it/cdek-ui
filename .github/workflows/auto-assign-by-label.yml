@@ -1,10 +1,10 @@
-name: Auto-assign by label
+name: Auto-manage assignees by labels
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, labeled, unlabeled, edited]
   pull_request:
-    types: [opened, labeled]
+    types: [opened, labeled, unlabeled, edited]
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
           token: ${{ secrets.ADD_TO_PROJECT_PAT }}
           fetch-depth: 1
 
-      - name: Auto-assign team members based on label
+      - name: Auto-manage assignees from label mapping
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
@@ -36,8 +36,10 @@ jobs:
               return;
             }
 
+            // Читаем файл с лейблами
             const configData = JSON.parse(fs.readFileSync(labelsPath, "utf8"));
 
+            // Сопоставление label → team
             const labelToTeam = {
               "area/design-system": "design-team",
               "area/components": "frontend-specialists",
@@ -57,30 +59,67 @@ jobs:
 
             const number = item.number;
             const labels = item.labels.map(l => l.name);
-            console.log("🏷️ Лейблы:", labels);
+            const repo = context.repo.repo;
+
+            console.log("🏷️ Текущие лейблы:", labels.join(", "));
+
+            // Получаем текущих ассайни
+            const currentAssignees = item.assignees?.map(a => a.login) || [];
+            console.log("👤 Текущие ассайни:", currentAssignees.join(", ") || "нет");
+
+            // Получаем участников всех команд, связанных с текущими лейблами
+            const desiredAssignees = new Set();
 
             for (const label of labels) {
               const team = labelToTeam[label];
               if (!team) continue;
 
               try {
-                // Получаем всех участников команды
                 const members = await github.rest.teams.listMembersInOrg({
                   org,
                   team_slug: team,
                 });
-
-                const usernames = members.data.map(m => m.login);
-                console.log(`👥 Назначаем команду ${team}: ${usernames.join(", ")}`);
-
-                await github.rest.issues.addAssignees({
-                  owner: org,
-                  repo: context.repo.repo,
-                  issue_number: number,
-                  assignees: usernames,
-                });
+                members.data.forEach(m => desiredAssignees.add(m.login));
               } catch (error) {
-                console.log(`⚠️ Ошибка при назначении для ${team}: ${error.message}`);
+                console.log(`⚠️ Не удалось получить участников команды ${team}: ${error.message}`);
               }
             }
 
+            console.log("✅ Желаемые ассайни:", Array.from(desiredAssignees).join(", ") || "нет");
+
+            // Определяем, кого добавить и кого убрать
+            const toAdd = Array.from(desiredAssignees).filter(a => !currentAssignees.includes(a));
+            const toRemove = currentAssignees.filter(a => !desiredAssignees.has(a));
+
+            console.log("➕ Добавить:", toAdd.join(", ") || "нет");
+            console.log("➖ Удалить:", toRemove.join(", ") || "нет");
+
+            // Добавляем новых
+            if (toAdd.length > 0) {
+              try {
+                await github.rest.issues.addAssignees({
+                  owner: org,
+                  repo,
+                  issue_number: number,
+                  assignees: toAdd
+                });
+                console.log("✅ Добавлены новые ассайни");
+              } catch (error) {
+                console.log(`⚠️ Ошибка при добавлении ассайни: ${error.message}`);
+              }
+            }
+
+            // Удаляем лишних
+            if (toRemove.length > 0) {
+              try {
+                await github.rest.issues.removeAssignees({
+                  owner: org,
+                  repo,
+                  issue_number: number,
+                  assignees: toRemove
+                });
+                console.log("✅ Удалены ненужные ассайни");
+              } catch (error) {
+                console.log(`⚠️ Ошибка при удалении ассайни: ${error.message}`);
+              }
+            }
