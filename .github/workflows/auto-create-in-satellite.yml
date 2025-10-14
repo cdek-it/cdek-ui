@@ -102,7 +102,7 @@ jobs:
                   issue_number: hubIssue.number,
                   body: '✅ **Задача автоматически создана в satellite!**\n\n' +
                         '**Satellite**: `' + targetRepo + '`\n' +
-                        '**Issue**: [#' + satelliteIssue.number + '](' + satelliteIssue.html_url + ')\n' +
+                        '**Satellite Issue**: [#' + satelliteIssue.number + '](' + satelliteIssue.html_url + ')\n' +
                         '**Auto-created**: ' + new Date().toLocaleString() + '\n\n' +
                         '**Статус**: 🟢 Активно в satellite'
                 });
