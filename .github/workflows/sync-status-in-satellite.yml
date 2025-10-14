@@ -1,4 +1,4 @@
-name: 📡 Sync Status to Satellite
+name: 📡 Sync Status from Hub
 
 on:
   issues:
@@ -7,13 +7,13 @@ on:
     types: [created, edited]
 
 jobs:
-  sync-to-satellite:
+  sync-from-hub:
     runs-on: ubuntu-latest
     steps:
-      - name: Check if routed to Satellite and sync status
+      - name: Check if from Hub and sync status
         uses: actions/github-script@v7
         env:
-          SATELLITE_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          HUB_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
         with:
           script: |
             const { issue, label, comment } = context.payload;
@@ -21,13 +21,13 @@ jobs:
             // Для событий комментариев проверяем, что комментарий в issue из Hub
             if (context.eventName === 'issue_comment') {
               const issueForComment = context.payload.issue;
-              const isRouted = issueForComment.labels.some(label => label.name === 'state/routed');
-              if (!isRouted) {
-                console.log('ℹ️ Not a routed Hub issue comment, skipping sync');
+              const isFromHub = issueForComment.labels.some(label => label.name === 'state/routed');
+              if (!isFromHub) {
+                console.log('ℹ️ Not a Hub issue comment, skipping sync');
                 return;
               }
               
-              // Ищем номер Satellite issue в описании
+              // Ищем номер Satellite issue в комментариях
               const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
               if (!satelliteIssueMatch) {
                 console.log('❌ Satellite issue reference not found in comment issue');
@@ -35,20 +35,20 @@ jobs:
               }
               
               const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-              const satelliteRepo = issueForComment.body.match(/Satellite Repository: `([^`]+)`/)[1];
+              const [satelliteOwner, satelliteRepoName] = '${{ github.repository }}'.split('/');
               
-              await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteRepo);
+              await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteOwner, satelliteRepoName);
               return;
             }
             
-            // Проверяем что задача направлена в Satellite
-            const isRouted = issue.labels.some(label => label.name === 'state/routed');
-            if (!isRouted) {
-              console.log('ℹ️ Not a routed Hub issue, skipping sync');
+            // Проверяем что задача создана из Hub
+            const isFromHub = issue.labels.some(label => label.name === 'state/routed');
+            if (!isFromHub) {
+              console.log('ℹ️ Not a Hub issue, skipping sync');
               return;
             }
             
-            // Ищем номер Satellite issue в описании
+            // Ищем номер Satellite issue в комментариях
             const satelliteIssueMatch = issue.body.match(/Satellite Issue.*#(\d+)/);
             if (!satelliteIssueMatch) {
               console.log('❌ Satellite issue reference not found');
@@ -56,7 +56,7 @@ jobs:
             }
             
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
+            const satelliteRepo = '${{ github.repository }}';
             
             // Определяем тип события для синхронизации лейблов
             if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
@@ -80,16 +80,16 @@ jobs:
                   status = 'open';
                   statusMessage = '🔄 Переоткрыто в Hub';
                   shouldReopen = true;
-                } else {
-                  // Проверяем наличие лейбла status/in-progress
-                  const hasInProgressLabel = hubIssue.labels.some(label => label.name === 'status/in-progress');
-                  if (hasInProgressLabel) {
-                    status = 'status/in-progress';
-                    statusMessage = '🔧 В работе';
-                  } else {
-                    status = 'open';
-                    statusMessage = '📋 Открыто в Hub';
                   }
+               } else if (hubIssue.state === 'open') {
+                // Проверяем наличие лейбла status/in-progress
+                const hasInProgressLabel = hubIssue.labels.some(label => label.name === 'status/in-progress');
+                if (hasInProgressLabel) {
+                  status = 'status/in-progress';
+                  statusMessage = '🔧 В работе';
+                } else {
+                  status = 'open';
+                  statusMessage = '📋 Открыто в Hub';
                 }
               }
               
@@ -128,7 +128,7 @@ jobs:
                   `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                   {
                     headers: {
-                      'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                      'Authorization': `token ${process.env.HUB_PAT}`,
                       'Accept': 'application/vnd.github.v3+json'
                     }
                   }
@@ -153,6 +153,8 @@ jobs:
                   if (satelliteLabelForPrefix && satelliteLabelForPrefix !== hubLabelForPrefix) {
                     labelsToRemove.push(satelliteLabelForPrefix);
                   }
+                  
+                  // Если в hub есть лейбл, но в satellite его нет - он будет добавлен ниже
                 }
                 
                 // Удаляем старые лейблы из satellite
@@ -162,7 +164,7 @@ jobs:
                     {
                       method: 'DELETE',
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Accept': 'application/vnd.github.v3+json'
                       }
                     }
@@ -181,7 +183,7 @@ jobs:
                     {
                       method: 'POST',
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/vnd.github.v3+json'
                       },
@@ -193,25 +195,28 @@ jobs:
                 
                 // Создаем комментарий о синхронизации лейблов
                 if (labelsToRemove.length > 0 || labelsToAdd.length > 0) {
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify({
-                        body: '**🏷️ Лейблы синхронизированы из Hub**\n\n' +
-                              '**Hub**: `' + context.repo.repo + '`\n' +
-                              '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
-                              (labelsToAdd.length > 0 ? '**Добавлены**: `' + labelsToAdd.join('`, `') + '`\n' : '') +
-                              (labelsToRemove.length > 0 ? '**Удалены**: `' + labelsToRemove.join('`, `') + '`\n' : '') +
-                              '**Время**: ' + new Date().toLocaleString()
-                      })
+                  const commentLines = [];
+                  
+                  if (labelsToAdd.length > 0) {
+                    commentLines.push('**Добавлены**: `' + labelsToAdd.join('`, `') + '`');
+                  }
+                  
+                  if (labelsToRemove.length > 0) {
+                    commentLines.push('**Удалены**: `' + labelsToRemove.join('`, `') + '`');
+                  }
+                  
+                  // Добавляем информацию о текущих синхронизированных лейблах
+                  const currentSyncInfo = [];
+                  for (const prefix of syncPrefixes) {
+                    const labelForPrefix = labelsToSync.find(label => label.startsWith(prefix));
+                    if (labelForPrefix) {
+                      currentSyncInfo.push(`**${prefix}**: \`${labelForPrefix}\``);
                     }
-                  );
+                  }
+                  
+                  if (currentSyncInfo.length > 0) {
+                    commentLines.push('**Текущие синхронизированные лейблы**:\n' + currentSyncInfo.join('\n'));
+                  }
                 }
                 
                 console.log(`✅ Synced labels to Satellite #${satelliteIssueNumber}`);
@@ -221,7 +226,7 @@ jobs:
               }
             }
 
-            async function syncCommentToSatellite(hubComment, hubIssue, satelliteIssueNumber, satelliteRepo) {
+            async function syncCommentToSatellite(hubComment, hubIssue, satelliteIssueNumber, satelliteOwner, satelliteRepo) {
               try {
                 console.log('💬 Syncing comment to Satellite');
                 
@@ -235,8 +240,7 @@ jobs:
                 }
                 
                 const commentBody = '**💬 Комментарий из Hub**\n\n' +
-                                    '**Hub**: `' + context.repo.repo + '`\n' +
-                                    '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
+                                    '**Hub Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                                     '**Автор**: @' + hubComment.user.login + '\n' +
                                     '**Время**: ' + new Date(hubComment.created_at).toLocaleString() + '\n\n' +
                                     '---\n\n' +
@@ -245,11 +249,11 @@ jobs:
                                     '*Комментарий синхронизирован автоматически*';
                 
                 const response = await fetch(
-                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
+                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
                   {
                     method: 'POST',
                     headers: {
-                      'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                      'Authorization': `token ${process.env.HUB_PAT}`,
                       'Content-Type': 'application/json',
                       'Accept': 'application/vnd.github.v3+json'
                     },
@@ -278,14 +282,13 @@ jobs:
                   {
                     method: 'POST',
                     headers: {
-                      'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                      'Authorization': `token ${process.env.HUB_PAT}`,
                       'Content-Type': 'application/json',
                       'Accept': 'application/vnd.github.v3+json'
                     },
                     body: JSON.stringify({
                       body: '**🔄 Статус обновлен из Hub**\n\n' +
-                            '**Hub**: `' + context.repo.repo + '`\n' +
-                            '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
+                            '**Hub Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                             '**Статус**: ' + statusMessage + '\n' +
                             '**Время**: ' + new Date().toLocaleString()
                     })
@@ -304,7 +307,7 @@ jobs:
                     `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                     {
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Accept': 'application/vnd.github.v3+json'
                       }
                     }
@@ -327,7 +330,7 @@ jobs:
                       {
                         method: 'DELETE',
                         headers: {
-                          'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                          'Authorization': `token ${process.env.HUB_PAT}`,
                           'Accept': 'application/vnd.github.v3+json'
                         }
                       }
@@ -340,7 +343,7 @@ jobs:
                     {
                       method: 'POST',
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/vnd.github.v3+json'
                       },
@@ -356,7 +359,7 @@ jobs:
                     {
                       method: 'PATCH',
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/vnd.github.v3+json'
                       },
@@ -372,7 +375,7 @@ jobs:
                     {
                       method: 'PATCH',
                       headers: {
-                        'Authorization': `token ${process.env.SATELLITE_PAT}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/vnd.github.v3+json'
                       },
@@ -383,6 +386,7 @@ jobs:
                   );
                   console.log('🔓 Reopened issue in Satellite');
                 }
+                
                 
                 console.log(`✅ Synced status to Satellite #${satelliteIssueNumber}: ${status}`);
                 
