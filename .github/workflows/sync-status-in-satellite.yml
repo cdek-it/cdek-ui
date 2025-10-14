@@ -42,21 +42,21 @@ jobs:
             }
             
             // Проверяем что задача направлена в Satellite
-            const issueForComment = context.payload.issue;
             const isRouted = issue.labels.some(label => label.name === 'state/routed');
             if (!isRouted) {
               console.log('ℹ️ Not a routed Hub issue, skipping sync');
               return;
             }
-
-            const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
-              if (!satelliteIssueMatch) {
-                console.log('❌ Satellite issue reference not found in comment issue');
-                return;
-              }
+            
+            // Ищем номер Satellite issue в описании
+            const satelliteIssueMatch = issue.body.match(/Satellite Issue.*#(\d+)/);
+            if (!satelliteIssueMatch) {
+              console.log('❌ Satellite issue reference not found');
+              return;
+            }
             
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = issueForComment.body.match(/Satellite: `([^`]+)`/)[1];
+            const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
             
             console.log(`🔧 Satellite repo: ${satelliteRepo}, Issue: #${satelliteIssueNumber}`);
             
