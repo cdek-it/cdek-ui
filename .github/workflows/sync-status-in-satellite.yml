@@ -37,7 +37,7 @@ jobs:
                   comment.body.includes('✅ **Задача автоматически создана в satellite!**') ||
                   comment.body.includes('Satellite Issue') ||
                   comment.body.includes('**Satellite**:') ||
-                  comment.body.includes('**Issue**: [#'))
+                  comment.body.includes('**Issue**: [#')
                 );
                 
                 if (!creationComment) {
