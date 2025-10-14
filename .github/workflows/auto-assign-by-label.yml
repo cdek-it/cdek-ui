@@ -22,7 +22,7 @@ jobs:
           token: ${{ secrets.ADD_TO_PROJECT_PAT }}
           fetch-depth: 1
 
-      - name: Auto-assign team based on labels-config.json
+      - name: Auto-assign team members based on label
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
@@ -30,17 +30,14 @@ jobs:
             const fs = require("fs");
             const path = require("path");
 
-            // путь к JSON
             const labelsPath = path.join(process.env.GITHUB_WORKSPACE, ".github", "labels-config.json");
-
             if (!fs.existsSync(labelsPath)) {
-              console.log("❌ Файл labels-config.json не найден!");
+              console.log("❌ labels-config.json не найден");
               return;
             }
 
             const configData = JSON.parse(fs.readFileSync(labelsPath, "utf8"));
 
-            // 🔹 Предварительно задаём сопоставление label → team
             const labelToTeam = {
               "area/design-system": "design-team",
               "area/components": "frontend-specialists",
@@ -53,32 +50,37 @@ jobs:
 
             const org = context.repo.owner;
             const item = context.payload.issue || context.payload.pull_request;
-
             if (!item) {
-              console.log("❌ Не найден issue или PR.");
+              console.log("❌ Не найден issue или PR");
               return;
             }
 
             const number = item.number;
             const labels = item.labels.map(l => l.name);
-
             console.log("🏷️ Лейблы:", labels);
 
             for (const label of labels) {
               const team = labelToTeam[label];
               if (!team) continue;
 
-              const assignee = `@${org}/${team}`;
-              console.log(`✅ Назначаем ${assignee} для лейбла ${label}`);
-
               try {
+                // Получаем всех участников команды
+                const members = await github.rest.teams.listMembersInOrg({
+                  org,
+                  team_slug: team,
+                });
+
+                const usernames = members.data.map(m => m.login);
+                console.log(`👥 Назначаем команду ${team}: ${usernames.join(", ")}`);
+
                 await github.rest.issues.addAssignees({
                   owner: org,
                   repo: context.repo.repo,
                   issue_number: number,
-                  assignees: [assignee]
+                  assignees: usernames,
                 });
               } catch (error) {
-                console.log(`⚠️ Не удалось назначить ${assignee}: ${error.message}`);
+                console.log(`⚠️ Ошибка при назначении для ${team}: ${error.message}`);
               }
             }
+
