@@ -18,73 +18,6 @@ jobs:
           script: |
             const { issue, label, comment } = context.payload;
 
-            // Функция для поиска информации о Satellite в комментариях
-            async function findSatelliteInfo(issueNumber) {
-              try {
-                console.log(`🔍 Searching for satellite info in issue #${issueNumber}`);
-                
-                // Получаем все комментарии к issue
-                const commentsResponse = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber
-                });
-                
-                console.log(`📝 Found ${commentsResponse.data.length} comments`);
-                
-                // Ищем комментарий с информацией о создании Satellite issue
-                const creationComment = commentsResponse.data.find(comment => 
-                  comment.body.includes('✅ **Задача автоматически создана в satellite!**') ||
-                  comment.body.includes('Satellite Issue') ||
-                  comment.body.includes('**Satellite**:') ||
-                  comment.body.includes('**Issue**: [#')
-                );
-                
-                if (!creationComment) {
-                  console.log('❌ Satellite creation comment not found');
-                  console.log('Available comments:');
-                  commentsResponse.data.forEach((c, i) => {
-                    console.log(`  ${i + 1}. ${c.body.substring(0, 100)}...`);
-                  });
-                  return null;
-                }
-                
-                console.log('✅ Found satellite creation comment');
-                
-                // Ищем номер Satellite issue
-                const satelliteIssueMatch = creationComment.body.match(/Issue.*\[#(\d+)\]/) || 
-                                           creationComment.body.match(/Issue.*#(\d+)/);
-                if (!satelliteIssueMatch) {
-                  console.log('❌ Satellite issue number not found in comment');
-                  console.log('Comment body:', creationComment.body);
-                  return null;
-                }
-                
-                // Ищем репозиторий Satellite
-                const satelliteRepoMatch = creationComment.body.match(/\*\*Satellite\*\*: `([^`]+)`/) ||
-                                          creationComment.body.match(/Satellite.*`([^`]+)`/);
-                if (!satelliteRepoMatch) {
-                  console.log('❌ Satellite repository not found in comment');
-                  console.log('Comment body:', creationComment.body);
-                  return null;
-                }
-                
-                const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-                const satelliteRepo = satelliteRepoMatch[1];
-                
-                console.log(`🔍 Found Satellite info: ${satelliteRepo}#${satelliteIssueNumber}`);
-                
-                return {
-                  issueNumber: satelliteIssueNumber,
-                  repo: satelliteRepo
-                };
-                
-              } catch (error) {
-                console.log(`❌ Error finding satellite info: ${error.message}`);
-                return null;
-              }
-            }
-
             // Для событий комментариев проверяем, что комментарий в issue из Hub
             if (context.eventName === 'issue_comment') {
               const issueForComment = context.payload.issue;
@@ -94,23 +27,17 @@ jobs:
                 return;
               }
               
-              // Пропускаем комментарии от ботов и системные комментарии
-              if (comment.user.type === 'Bot' || 
-                  comment.body.includes('🔄 Статус обновлен') ||
-                  comment.body.includes('🏷️ Лейблы синхронизированы') ||
-                  comment.body.includes('✅ Задача автоматически создана')) {
-                console.log('ℹ️ Skipping bot or system comment');
+              // Ищем номер Satellite issue в описании
+              const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
+              if (!satelliteIssueMatch) {
+                console.log('❌ Satellite issue reference not found in comment issue');
                 return;
               }
               
-              // Ищем информацию о Satellite в комментариях
-              const satelliteInfo = await findSatelliteInfo(issueForComment.number);
-              if (!satelliteInfo) {
-                console.log('❌ Satellite info not found in comments');
-                return;
-              }
+              const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
+              const satelliteRepo = issueForComment.body.match(/Satellite Repository: `([^`]+)`/)[1];
               
-              await syncCommentToSatellite(comment, issueForComment, satelliteInfo.issueNumber, satelliteInfo.repo);
+              await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteRepo);
               return;
             }
             
@@ -121,63 +48,24 @@ jobs:
               return;
             }
             
-            // Ищем информацию о Satellite в комментариях
-            const satelliteInfo = await findSatelliteInfo(issue.number);
-            if (!satelliteInfo) {
-              console.log('❌ Satellite info not found in comments');
+            // Ищем номер Satellite issue в описании
+            const satelliteIssueMatch = issue.body.match(/Satellite Issue.*#(\d+)/);
+            if (!satelliteIssueMatch) {
+              console.log('❌ Satellite issue reference not found');
               return;
             }
             
-            const satelliteIssueNumber = satelliteInfo.issueNumber;
-            const satelliteRepo = satelliteInfo.repo;
-            
-            console.log(`🔧 Satellite repo: ${satelliteRepo}, Issue: #${satelliteIssueNumber}`);
-            
-            // Проверяем доступность PAT
-            if (!process.env.SATELLITE_PAT) {
-              console.log('❌ SATELLITE_PAT token is missing');
-              return;
-            }
-
-            // Разбираем owner и repo из satelliteRepo
-            const [satelliteOwner, satelliteRepoName] = satelliteRepo.split('/');
-            if (!satelliteOwner || !satelliteRepoName) {
-              console.log(`❌ Invalid satellite repo format: ${satelliteRepo}`);
-              return;
-            }
-
-            console.log(`🔧 Satellite owner: ${satelliteOwner}, repo: ${satelliteRepoName}`);
-            
-            // Проверяем доступ к satellite репозиторию
-            try {
-              const testResponse = await fetch(
-                `https://api.github.com/repos/${satelliteRepo}`,
-                {
-                  headers: {
-                    'Authorization': `token ${process.env.SATELLITE_PAT}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                  }
-                }
-              );
-              
-              if (!testResponse.ok) {
-                console.log(`❌ Cannot access satellite repo ${satelliteRepo}: ${testResponse.status}`);
-                return;
-              }
-              console.log(`✅ Satellite repo ${satelliteRepo} is accessible`);
-            } catch (error) {
-              console.log(`❌ Error accessing satellite repo: ${error.message}`);
-              return;
-            }
+            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
+            const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
             
             // Определяем тип события для синхронизации лейблов
             if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
-              await syncLabelsToSatellite(issue, satelliteIssueNumber, satelliteOwner, satelliteRepoName, label);
+              await syncLabelsToSatellite(issue, satelliteIssueNumber, satelliteRepo, label);
             }
             
-            await syncStatusToSatellite(issue, satelliteIssueNumber, satelliteOwner, satelliteRepoName);
+            await syncStatusToSatellite(issue, satelliteIssueNumber, satelliteRepo);
             
-            async function syncStatusToSatellite(hubIssue, satelliteIssueNumber, satelliteOwner, satelliteRepo) {
+            async function syncStatusToSatellite(hubIssue, satelliteIssueNumber, satelliteRepo) {
               let status = '';
               let statusMessage = '';
               let shouldReopen = false;
@@ -208,10 +96,10 @@ jobs:
               if (!status) return;
               
               // Отправляем статус в Satellite
-              await updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteOwner, satelliteRepo, shouldReopen);
+              await updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteRepo, shouldReopen);
             }
             
-            async function syncLabelsToSatellite(hubIssue, satelliteIssueNumber, satelliteOwner, satelliteRepo, changedLabel) {
+            async function syncLabelsToSatellite(hubIssue, satelliteIssueNumber, satelliteRepo, changedLabel) {
               try {
                 const syncPrefixes = ['status/', 'priority/', 'area/', 'type/'];
                 const changedLabelName = changedLabel?.name;
@@ -223,7 +111,7 @@ jobs:
                   return;
                 }
                 
-                console.log('🔄 Syncing label to Satellite: ' + changedLabelName);
+                console.log('🔄 Syncing label: ' + changedLabelName);
                 
                 // Получаем текущие лейблы hub issue
                 const currentLabels = hubIssue.labels.map(l => l.name);
@@ -237,7 +125,7 @@ jobs:
                 
                 // Получаем текущие лейблы satellite issue используя PAT
                 const satelliteIssueResponse = await fetch(
-                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}`,
+                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                   {
                     headers: {
                       'Authorization': `token ${process.env.SATELLITE_PAT}`,
@@ -246,17 +134,12 @@ jobs:
                   }
                 );
                 
-                console.log(`🔧 Satellite API response status: ${satelliteIssueResponse.status}`);
-                
                 if (!satelliteIssueResponse.ok) {
-                  const errorText = await satelliteIssueResponse.text();
-                  console.log(`🔧 Satellite API error response: ${errorText}`);
-                  throw new Error(`Failed to get satellite issue: ${satelliteIssueResponse.status} - ${errorText}`);
+                  throw new Error(`Failed to get satellite issue: ${satelliteIssueResponse.status}`);
                 }
                 
                 const satelliteIssue = await satelliteIssueResponse.json();
                 const currentSatelliteLabels = satelliteIssue.labels.map(l => l.name);
-                console.log('📋 Current satellite labels: ' + currentSatelliteLabels.join(', '));
                 
                 // Определяем какие лейблы нужно удалить из satellite
                 const labelsToRemove = [];
@@ -272,12 +155,10 @@ jobs:
                   }
                 }
                 
-                console.log('🗑️ Labels to remove from satellite: ' + labelsToRemove.join(', '));
-                
                 // Удаляем старые лейблы из satellite
                 for (const labelToRemove of labelsToRemove) {
-                  const deleteResponse = await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(labelToRemove)}`,
+                  await fetch(
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(labelToRemove)}`,
                     {
                       method: 'DELETE',
                       headers: {
@@ -286,12 +167,7 @@ jobs:
                       }
                     }
                   );
-                  
-                  if (deleteResponse.ok) {
-                    console.log('🗑️ Removed label from Satellite: ' + labelToRemove);
-                  } else {
-                    console.log('⚠️ Failed to remove label: ' + labelToRemove + ', status: ' + deleteResponse.status);
-                  }
+                  console.log('🗑️ Removed label from Satellite: ' + labelToRemove);
                 }
                 
                 // Добавляем новые лейблы (только те, которых нет в satellite)
@@ -299,11 +175,9 @@ jobs:
                   !currentSatelliteLabels.includes(labelName)
                 );
                 
-                console.log('✅ Labels to add to satellite: ' + labelsToAdd.join(', '));
-
                 if (labelsToAdd.length > 0) {
-                  const addResponse = await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
+                  await fetch(
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
                     {
                       method: 'POST',
                       headers: {
@@ -314,18 +188,13 @@ jobs:
                       body: JSON.stringify(labelsToAdd)
                     }
                   );
-                  
-                  if (addResponse.ok) {
-                    console.log('✅ Added labels to Satellite: ' + labelsToAdd.join(', '));
-                  } else {
-                    console.log('⚠️ Failed to add labels, status: ' + addResponse.status);
-                  }
+                  console.log('✅ Added labels to Satellite: ' + labelsToAdd.join(', '));
                 }
                 
                 // Создаем комментарий о синхронизации лейблов
                 if (labelsToRemove.length > 0 || labelsToAdd.length > 0) {
                   await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
                     {
                       method: 'POST',
                       headers: {
@@ -356,10 +225,12 @@ jobs:
               try {
                 console.log('💬 Syncing comment to Satellite');
                 
-                // Разбираем owner и repo из satelliteRepo
-                const [satelliteOwner, satelliteRepoName] = satelliteRepo.split('/');
-                if (!satelliteOwner || !satelliteRepoName) {
-                  console.log(`❌ Invalid satellite repo format: ${satelliteRepo}`);
+                // Пропускаем комментарии от ботов и системные комментарии
+                if (hubComment.user.type === 'Bot' || 
+                    hubComment.body.includes('🔄 Статус обновлен') ||
+                    hubComment.body.includes('🏷️ Лейблы синхронизированы') ||
+                    hubComment.body.includes('✅ Задача автоматически создана')) {
+                  console.log('ℹ️ Skipping bot or system comment');
                   return;
                 }
                 
@@ -374,7 +245,7 @@ jobs:
                                     '*Комментарий синхронизирован автоматически*';
                 
                 const response = await fetch(
-                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepoName}/issues/${satelliteIssueNumber}/comments`,
+                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
                   {
                     method: 'POST',
                     headers: {
@@ -399,11 +270,11 @@ jobs:
               }
             }
             
-            async function updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteOwner, satelliteRepo, shouldReopen = false) {
+            async function updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteRepo, shouldReopen = false) {
               try {
                 // Обновляем комментарий в Satellite используя PAT
                 await fetch(
-                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
+                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
                   {
                     method: 'POST',
                     headers: {
@@ -430,7 +301,7 @@ jobs:
                 if (newStatusLabel) {
                   // Получаем текущие лейблы satellite issue
                   const satelliteIssueResponse = await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}`,
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                     {
                       headers: {
                         'Authorization': `token ${process.env.SATELLITE_PAT}`,
@@ -452,7 +323,7 @@ jobs:
                   
                   for (const oldLabel of oldStatusLabels) {
                     await fetch(
-                      `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(oldLabel)}`,
+                      `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(oldLabel)}`,
                       {
                         method: 'DELETE',
                         headers: {
@@ -465,7 +336,7 @@ jobs:
                   
                   // Добавляем новую статусную метку
                   await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
                     {
                       method: 'POST',
                       headers: {
@@ -481,7 +352,7 @@ jobs:
                 // Если задача завершена в Hub, закрываем в Satellite
                 if (status === 'closed') {
                   await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}`,
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                     {
                       method: 'PATCH',
                       headers: {
@@ -495,11 +366,9 @@ jobs:
                     }
                   );
                 }
-                
-                // Если задача переоткрыта в Hub, переоткрываем в Satellite
                 if (shouldReopen) {
                   await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}`,
+                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
                     {
                       method: 'PATCH',
                       headers: {
