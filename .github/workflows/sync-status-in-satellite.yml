@@ -47,8 +47,16 @@ jobs:
               console.log('ℹ️ Not a Hub issue, skipping sync');
               return;
             }
+
+            // Ищем номер Satellite issue в комментариях
+            const issueForComment = context.payload.issue;
+            const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
+            if (!satelliteIssueMatch) {
+              console.log('❌ Satellite issue reference not found');
+              return;
+            }
             
-            const satelliteIssueNumber = parseInt(satelliteIssueNumber[1]);
+            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
             const satelliteRepo = '${{ github.repository }}';
             
             // Определяем тип события для синхронизации лейблов
