@@ -18,6 +18,58 @@ jobs:
           script: |
             const { issue, label, comment } = context.payload;
 
+            // Функция для поиска информации о Satellite в комментариях
+            async function findSatelliteInfo(issueNumber) {
+              try {
+                // Получаем все комментарии к issue
+                const commentsResponse = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+                
+                // Ищем комментарий с информацией о создании Satellite issue
+                const creationComment = commentsResponse.data.find(comment => 
+                  comment.body.includes('✅ **Задача автоматически создана в satellite!**') ||
+                  comment.body.includes('Satellite Issue') ||
+                  comment.body.includes('Satellite:')
+                );
+                
+                if (!creationComment) {
+                  console.log('❌ Satellite creation comment not found');
+                  return null;
+                }
+                
+                // Ищем номер Satellite issue
+                const satelliteIssueMatch = creationComment.body.match(/Issue.*#(\d+)/);
+                if (!satelliteIssueMatch) {
+                  console.log('❌ Satellite issue number not found in comment');
+                  return null;
+                }
+                
+                // Ищем репозиторий Satellite
+                const satelliteRepoMatch = creationComment.body.match(/Satellite.*`([^`]+)`/);
+                if (!satelliteRepoMatch) {
+                  console.log('❌ Satellite repository not found in comment');
+                  return null;
+                }
+                
+                const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
+                const satelliteRepo = satelliteRepoMatch[1];
+                
+                console.log(`🔍 Found Satellite info: ${satelliteRepo}#${satelliteIssueNumber}`);
+                
+                return {
+                  issueNumber: satelliteIssueNumber,
+                  repo: satelliteRepo
+                };
+                
+              } catch (error) {
+                console.log(`❌ Error finding satellite info: ${error.message}`);
+                return null;
+              }
+            }
+
             // Для событий комментариев проверяем, что комментарий в issue из Hub
             if (context.eventName === 'issue_comment') {
               const issueForComment = context.payload.issue;
@@ -27,17 +79,14 @@ jobs:
                 return;
               }
               
-              // Ищем номер Satellite issue в описании
-              const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
-              if (!satelliteIssueMatch) {
-                console.log('❌ Satellite issue reference not found in comment issue');
+              // Ищем информацию о Satellite в комментариях
+              const satelliteInfo = await findSatelliteInfo(issueForComment.number);
+              if (!satelliteInfo) {
+                console.log('❌ Satellite info not found in comments');
                 return;
               }
               
-              const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-              const satelliteRepo = issueForComment.body.match(/Satellite Repository: `([^`]+)`/)[1];
-              
-              await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteRepo);
+              await syncCommentToSatellite(comment, issueForComment, satelliteInfo.issueNumber, satelliteInfo.repo);
               return;
             }
             
@@ -48,15 +97,15 @@ jobs:
               return;
             }
             
-            // Ищем номер Satellite issue в описании
-            const satelliteIssueMatch = issue.body.match(/Satellite Issue.*#(\d+)/);
-            if (!satelliteIssueMatch) {
-              console.log('❌ Satellite issue reference not found');
+            // Ищем информацию о Satellite в комментариях
+            const satelliteInfo = await findSatelliteInfo(issue.number);
+            if (!satelliteInfo) {
+              console.log('❌ Satellite info not found in comments');
               return;
             }
             
-            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
+            const satelliteIssueNumber = satelliteInfo.issueNumber;
+            const satelliteRepo = satelliteInfo.repo;
             
             console.log(`🔧 Satellite repo: ${satelliteRepo}, Issue: #${satelliteIssueNumber}`);
             
