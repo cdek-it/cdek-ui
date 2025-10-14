@@ -2,9 +2,9 @@ name: Auto Kanban
 
 on:
   issues:
-    types: [opened, closed, assigned, labeled]
+    types: [opened, closed, assigned, labeled, reopened]
   pull_request:
-    types: [opened, closed, assigned, labeled]
+    types: [opened, closed, assigned, labeled, reopened]
 
 env:
   PROJECT_URL: https://github.com/orgs/cdek-it/projects/2
@@ -82,12 +82,12 @@ jobs:
           field-keys: Status
           field-values: CLOSED
 
-      - name: Move to BLOCKED
-        if: github.event.action == 'labeled' && github.event.label.name == 'blocked'
+      - name: Move to OPEN (re-opened)
+        if: github.event.action == 'reopened'
         uses: titoportas/update-project-fields@v0.1.0
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
           item-id: ${{ steps.item.outputs.itemId }}
           field-keys: Status
-          field-values: BLOCKED
+          field-values: OPEN
