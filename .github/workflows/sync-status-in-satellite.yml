@@ -47,6 +47,12 @@ jobs:
               console.log('ℹ️ Not a routed Hub issue, skipping sync');
               return;
             }
+
+            const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
+              if (!satelliteIssueMatch) {
+                console.log('❌ Satellite issue reference not found in comment issue');
+                return;
+              }
             
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
             const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
