@@ -55,7 +55,7 @@ jobs:
               }
             
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = issue.body.match(/Satellite Repository: `([^`]+)`/)[1];
+            const satelliteRepo = issueForComment.body.match(/Satellite: `([^`]+)`/)[1];
             
             console.log(`🔧 Satellite repo: ${satelliteRepo}, Issue: #${satelliteIssueNumber}`);
             
