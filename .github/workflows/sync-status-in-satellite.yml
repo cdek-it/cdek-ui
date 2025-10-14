@@ -41,7 +41,7 @@ jobs:
                 }
                 
                 // Ищем номер Satellite issue
-                const satelliteIssueMatch = creationComment.body.match(/Issue.*#(\d+)/);
+                const satelliteIssueMatch = creationComment.body.match(/Satellite Issue.*#(\d+)/);
                 if (!satelliteIssueMatch) {
                   console.log('❌ Satellite issue number not found in comment');
                   return null;
