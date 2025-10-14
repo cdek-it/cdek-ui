@@ -42,6 +42,7 @@ jobs:
             }
             
             // Проверяем что задача направлена в Satellite
+            const issueForComment = context.payload.issue;
             const isRouted = issue.labels.some(label => label.name === 'state/routed');
             if (!isRouted) {
               console.log('ℹ️ Not a routed Hub issue, skipping sync');
