@@ -42,6 +42,7 @@ jobs:
             }
             
             // Проверяем что задача создана из Hub
+            const issueForComment = context.payload.issue;
             const isFromHub = issue.labels.some(label => label.name === 'state/routed');
             if (!isFromHub) {
               console.log('ℹ️ Not a Hub issue, skipping sync');
