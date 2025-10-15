@@ -50,9 +50,9 @@ jobs:
             }
             
             // Ищем номер Satellite issue в комментариях
-            const satelliteIssueMatch = issueForComment;
+            const satelliteIssueMatch = issueForComment.body.match(/Issue.*#(\d+)/);
             if (!satelliteIssueMatch) {
-              console.log('❌ Satellite issue number not found in comment' + satelliteIssueMatch);
+              console.log('❌ Satellite issue number not found in comment' + issueForComment);
               return satelliteIssueMatch;
             }
             
