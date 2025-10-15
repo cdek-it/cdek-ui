@@ -1,219 +1,234 @@
-name: 📡 Sync Status from Hub
+name: 🔄 Sync from Hub to Satellite
 
 on:
   issues:
-    types: [closed, reopened, labeled, unlabeled]
+    types: [closed, reopened, labeled, unlabeled, edited]
   issue_comment:
     types: [created, edited]
 
 jobs:
-  sync-from-hub:
+  sync-to-satellite:
     runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'state/routed')
+    
     steps:
-      - name: Check if from Hub and sync status
+      - name: Sync status and labels to satellite
         uses: actions/github-script@v7
         env:
-          HUB_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          SYNC_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
         with:
           script: |
             const { issue, label, comment } = context.payload;
 
-            // Для событий комментариев проверяем, что комментарий в issue из Hub
-            if (context.eventName === 'issue_comment') {
-              const issueForComment = context.payload.issue;
-              const isFromHub = issueForComment.labels.some(label => label.name === 'state/routed');
-              if (!isFromHub) {
-                console.log('ℹ️ Not a Hub issue comment, skipping sync');
-                return;
-              }
-              
-              // Ищем номер Satellite issue в комментариях
-              const satelliteIssueMatch = await findSatelliteIssueInComments(issueForComment);
-              if (!satelliteIssueMatch) {
-                console.log('❌ Satellite issue reference not found in comments');
-                return;
-              }
-              
-              const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-              const [satelliteOwner, satelliteRepoName] = '${{ github.repository_owner }}/${{ github.event.repository.name }}'.split('/');
-              
-              await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteOwner, satelliteRepoName);
+            // Проверяем что задача маршрутизирована в satellite
+            const isRouted = issue.labels.some(l => l.name === 'state/routed');
+            if (!isRouted) {
+              console.log('ℹ️ Issue not routed to satellite, skipping sync');
               return;
             }
-            
-            // Проверяем что задача создана из Hub
-            const isFromHub = issue.labels.some(label => label.name === 'state/routed');
-            if (!isFromHub) {
-              console.log('ℹ️ Not a Hub issue, skipping sync');
-              return;
-            }
-            
-            // Ищем номер Satellite issue в комментариях
-            const satelliteIssueMatch = await findSatelliteIssueInComments(issue);
-            if (!satelliteIssueMatch) {
+
+            // Ищем информацию о satellite issue в комментариях
+            const satelliteInfo = await findSatelliteInfoFromComments(issue.number);
+            if (!satelliteInfo) {
               console.log('❌ Satellite issue reference not found in comments');
               return;
             }
-            
-            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = '${{ github.repository_owner }}/${{ github.event.repository.name }}';
-            
-            // Определяем тип события для синхронизации лейблов
-            if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
-              await syncLabelsToSatellite(issue, satelliteIssueNumber, satelliteRepo, label);
+
+            // Для событий комментариев
+            if (context.eventName === 'issue_comment') {
+              await syncCommentToSatellite(comment, issue, satelliteInfo);
+              return;
             }
-            
-            await syncStatusToSatellite(issue, satelliteIssueNumber, satelliteRepo);
-            
-            async function findSatelliteIssueInComments(hubIssue) {
-              // Получаем комментарии issue
-              const commentsResponse = await fetch(
-                `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/issues/${hubIssue.number}/comments`,
-                {
-                  headers: {
-                    'Authorization': `token ${process.env.HUB_PAT}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                  }
+
+            // Синхронизация лейблов
+            if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
+              await syncLabelsToSatellite(issue, satelliteInfo, label);
+            }
+
+            // Синхронизация статуса
+            await syncStatusToSatellite(issue, satelliteInfo);
+
+            // Синхронизация заголовка и описания
+            if (context.eventName === 'issues' && context.payload.action === 'edited') {
+              await syncContentToSatellite(issue, satelliteInfo);
+            }
+
+            async function findSatelliteInfoFromComments(issueNumber) {
+              try {
+                // Получаем все комментарии к задаче
+                const commentsResponse = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+
+                const comments = commentsResponse.data;
+
+                // Ищем комментарий с информацией о создании satellite issue
+                const creationComment = comments.find(comment => 
+                  comment.body.includes('✅ Задача автоматически создана в satellite') &&
+                  comment.body.includes('Satellite Issue')
+                );
+
+                if (!creationComment) {
+                  console.log('❌ Satellite creation comment not found');
+                  return null;
                 }
-              );
-              
-              if (!commentsResponse.ok) {
-                console.log('❌ Failed to get comments');
+
+                // Извлекаем информацию из комментария
+                const satelliteMatch = creationComment.body.match(/Satellite Issue.*#(\d+).*\((https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/\d+)\)/);
+                const satelliteRepoMatch = creationComment.body.match(/Satellite.*`([^`]+)`/);
+                
+                if (!satelliteMatch || !satelliteRepoMatch) {
+                  console.log('❌ Could not extract satellite info from comment');
+                  return null;
+                }
+
+                const satelliteIssueNumber = parseInt(satelliteMatch[1]);
+                const satelliteIssueUrl = satelliteMatch[2];
+                const satelliteRepo = satelliteRepoMatch[1];
+                
+                // Извлекаем owner и repo из URL
+                const urlParts = satelliteIssueUrl.split('/');
+                const satelliteOwner = urlParts[3];
+                const satelliteRepoName = urlParts[4];
+
+                return {
+                  number: satelliteIssueNumber,
+                  url: satelliteIssueUrl,
+                  repo: satelliteRepo,
+                  owner: satelliteOwner,
+                  repoName: satelliteRepoName
+                };
+
+              } catch (error) {
+                console.log('❌ Error searching satellite info in comments: ' + error.message);
                 return null;
               }
-              
-              const comments = await commentsResponse.json();
-              
-              // Ищем в комментариях ссылку на Satellite issue
-              for (const comment of comments) {
-                const match = comment.body.match(/Satellite Issue.*#(\d+)/);
-                if (match) {
-                  return match;
-                }
-              }
-              
-              return null;
             }
-            
-            async function syncStatusToSatellite(hubIssue, satelliteIssueNumber, satelliteRepo) {
-              let status = '';
-              let statusMessage = '';
-              let shouldReopen = false;
-              
-              // Определяем статус на основе состояния и лейблов
-              if (hubIssue.state === 'closed') {
-                status = 'closed';
-                statusMessage = '✅ Завершено в Hub';
-              } else if (hubIssue.state === 'open') {
-                // Если issue была переоткрыта (reopened)
-                if (context.payload.action === 'reopened') {
-                  status = 'open';
-                  statusMessage = '🔄 Переоткрыто в Hub';
-                  shouldReopen = true;
+
+            async function syncStatusToSatellite(hubIssue, satelliteInfo) {
+              try {
+                let state = 'open';
+
+                if (hubIssue.state === 'closed') {
+                  state = 'closed';
+                } else if (hubIssue.state === 'open' && context.payload.action === 'reopened') {
+                  state = 'open';
+                }
+
+                if (!state) return;
+
+                // Обновляем статус в satellite
+                const response = await fetch(
+                  `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Authorization': `token ${process.env.SYNC_TOKEN}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/vnd.github.v3+json'
+                    },
+                    body: JSON.stringify({
+                      state: state
+                    })
                   }
-               } else if (hubIssue.state === 'open') {
-                // Проверяем наличие лейбла status/in-progress
-                const hasInProgressLabel = hubIssue.labels.some(label => label.name === 'status/in-progress');
-                if (hasInProgressLabel) {
-                  status = 'status/in-progress';
-                  statusMessage = '🔧 В работе';
-                } else {
-                  status = 'open';
-                  statusMessage = '📋 Открыто в Hub';
+                );
+
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
                 }
+
+                console.log(`✅ Synced status to Satellite ${satelliteInfo.repo}#${satelliteInfo.number}: ${state}`);
+
+              } catch (error) {
+                console.log(`❌ Failed to sync status to Satellite: ${error.message}`);
               }
-              
-              if (!status) return;
-              
-              // Отправляем статус в Satellite
-              await updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteRepo, shouldReopen);
             }
-            
-            async function syncLabelsToSatellite(hubIssue, satelliteIssueNumber, satelliteRepo, changedLabel) {
+
+            async function syncLabelsToSatellite(hubIssue, satelliteInfo, changedLabel) {
               try {
                 const syncPrefixes = ['status/', 'priority/', 'area/', 'type/'];
                 const changedLabelName = changedLabel?.name;
-                
+
                 // Проверяем, относится ли измененный лейбл к синхронизируемым
                 const shouldSync = syncPrefixes.some(prefix => changedLabelName?.startsWith(prefix));
                 if (!shouldSync) {
                   console.log('ℹ️ Label not in sync scope: ' + changedLabelName);
                   return;
                 }
-                
-                console.log('🔄 Syncing label: ' + changedLabelName);
-                
+
+                console.log('🔄 Syncing label to satellite: ' + changedLabelName);
+
                 // Получаем текущие лейблы hub issue
-                const currentLabels = hubIssue.labels.map(l => l.name);
-                
-                // Фильтруем лейблы для синхронизации - берем ВСЕ лейблы с нужными префиксами
-                const labelsToSync = currentLabels.filter(labelName => 
+                const currentHubLabels = hubIssue.labels.map(l => l.name);
+
+                // Фильтруем лейблы для синхронизации
+                const labelsToSync = currentHubLabels.filter(labelName => 
                   syncPrefixes.some(prefix => labelName.startsWith(prefix))
                 );
-                
-                console.log('📋 All labels to sync from hub: ' + labelsToSync.join(', '));
-                
-                // Получаем текущие лейблы satellite issue используя PAT
-                const satelliteIssueResponse = await fetch(
-                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
+
+                console.log('📋 Labels to sync to satellite: ' + labelsToSync.join(', '));
+
+                // Получаем текущие лейблы satellite issue
+                const satelliteResponse = await fetch(
+                  `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}`,
                   {
                     headers: {
-                      'Authorization': `token ${process.env.HUB_PAT}`,
+                      'Authorization': `token ${process.env.SYNC_TOKEN}`,
                       'Accept': 'application/vnd.github.v3+json'
                     }
                   }
                 );
-                
-                if (!satelliteIssueResponse.ok) {
-                  throw new Error(`Failed to get satellite issue: ${satelliteIssueResponse.status}`);
+
+                if (!satelliteResponse.ok) {
+                  throw new Error(`Failed to get satellite issue: ${satelliteResponse.status}`);
                 }
-                
-                const satelliteIssue = await satelliteIssueResponse.json();
+
+                const satelliteIssue = await satelliteResponse.json();
                 const currentSatelliteLabels = satelliteIssue.labels.map(l => l.name);
-                
+
                 // Определяем какие лейблы нужно удалить из satellite
                 const labelsToRemove = [];
-                
-                // Для каждого префикса находим текущий лейбл в satellite и сравниваем с hub
+
+                // Для каждого префикса находим текущий лейбл в hub и сравниваем с satellite
                 for (const prefix of syncPrefixes) {
                   const hubLabelForPrefix = labelsToSync.find(label => label.startsWith(prefix));
                   const satelliteLabelForPrefix = currentSatelliteLabels.find(label => label.startsWith(prefix));
-                  
+
                   // Если в satellite есть лейбл этого префикса, но в hub его нет или он другой - удаляем
                   if (satelliteLabelForPrefix && satelliteLabelForPrefix !== hubLabelForPrefix) {
                     labelsToRemove.push(satelliteLabelForPrefix);
                   }
-                  
-                  // Если в hub есть лейбл, но в satellite его нет - он будет добавлен ниже
                 }
-                
+
                 // Удаляем старые лейблы из satellite
                 for (const labelToRemove of labelsToRemove) {
                   await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(labelToRemove)}`,
+                    `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}/labels/${encodeURIComponent(labelToRemove)}`,
                     {
                       method: 'DELETE',
                       headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
+                        'Authorization': `token ${process.env.SYNC_TOKEN}`,
                         'Accept': 'application/vnd.github.v3+json'
                       }
                     }
                   );
                   console.log('🗑️ Removed label from Satellite: ' + labelToRemove);
                 }
-                
+
                 // Добавляем новые лейблы (только те, которых нет в satellite)
                 const labelsToAdd = labelsToSync.filter(labelName => 
                   !currentSatelliteLabels.includes(labelName)
                 );
-                
+
                 if (labelsToAdd.length > 0) {
                   await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
+                    `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}/labels`,
                     {
                       method: 'POST',
                       headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
+                        'Authorization': `token ${process.env.SYNC_TOKEN}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/vnd.github.v3+json'
                       },
@@ -222,27 +237,28 @@ jobs:
                   );
                   console.log('✅ Added labels to Satellite: ' + labelsToAdd.join(', '));
                 }
-                
-                console.log(`✅ Synced labels to Satellite #${satelliteIssueNumber}`);
-                
+
+                console.log(`✅ Synced labels to Satellite ${satelliteInfo.repo}#${satelliteInfo.number}`);
+
               } catch (error) {
                 console.log(`❌ Failed to sync labels to Satellite: ${error.message}`);
               }
             }
 
-            async function syncCommentToSatellite(hubComment, hubIssue, satelliteIssueNumber, satelliteOwner, satelliteRepo) {
+            async function syncCommentToSatellite(hubComment, hubIssue, satelliteInfo) {
               try {
                 console.log('💬 Syncing comment to Satellite');
-                
+
                 // Пропускаем комментарии от ботов и системные комментарии
                 if (hubComment.user.type === 'Bot' || 
                     hubComment.body.includes('🔄 Статус обновлен') ||
                     hubComment.body.includes('🏷️ Лейблы синхронизированы') ||
-                    hubComment.body.includes('✅ Задача автоматически создана')) {
+                    hubComment.body.includes('✅ Задача автоматически создана') ||
+                    hubComment.body.includes('💬 Комментарий из Satellite')) {
                   console.log('ℹ️ Skipping bot or system comment');
                   return;
                 }
-                
+
                 const commentBody = '**💬 Комментарий из Hub**\n\n' +
                                     '**Hub Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                                     '**Автор**: @' + hubComment.user.login + '\n' +
@@ -251,13 +267,13 @@ jobs:
                                     hubComment.body + '\n\n' +
                                     '---\n\n' +
                                     '*Комментарий синхронизирован автоматически*';
-                
+
                 const response = await fetch(
-                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
+                  `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}/comments`,
                   {
                     method: 'POST',
                     headers: {
-                      'Authorization': `token ${process.env.HUB_PAT}`,
+                      'Authorization': `token ${process.env.SYNC_TOKEN}`,
                       'Content-Type': 'application/json',
                       'Accept': 'application/vnd.github.v3+json'
                     },
@@ -266,115 +282,45 @@ jobs:
                     })
                   }
                 );
-                
+
                 if (!response.ok) {
                   throw new Error(`Failed to create comment in satellite: ${response.status}`);
                 }
-                
-                console.log(`✅ Synced comment to Satellite #${satelliteIssueNumber}`);
-                
+
+                console.log(`✅ Synced comment to Satellite ${satelliteInfo.repo}#${satelliteInfo.number}`);
+
               } catch (error) {
                 console.log(`❌ Failed to sync comment to Satellite: ${error.message}`);
               }
             }
-            
-            async function updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteRepo, shouldReopen = false) {
+
+            async function syncContentToSatellite(hubIssue, satelliteInfo) {
               try {
-                // Обновляем метки статуса в Satellite
-                const statusLabels = {
-                  'in-progress': 'status/in-progress'
-                };
-                
-                const newStatusLabel = statusLabels[status];
-                if (newStatusLabel) {
-                  // Получаем текущие лейблы satellite issue
-                  const satelliteIssueResponse = await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
-                    {
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                      }
-                    }
-                  );
-                  
-                  if (!satelliteIssueResponse.ok) {
-                    throw new Error(`Failed to get satellite issue: ${satelliteIssueResponse.status}`);
+                console.log('📝 Syncing content to Satellite');
+
+                // Обновляем заголовок в satellite
+                const response = await fetch(
+                  `https://api.github.com/repos/${satelliteInfo.owner}/${satelliteInfo.repoName}/issues/${satelliteInfo.number}`,
+                  {
+                    method: 'PATCH',
+                    headers: {
+                      'Authorization': `token ${process.env.SYNC_TOKEN}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/vnd.github.v3+json'
+                    },
+                    body: JSON.stringify({
+                      title: '[From Hub] ' + hubIssue.title
+                    })
                   }
-                  
-                  const satelliteIssue = await satelliteIssueResponse.json();
-                  
-                  // Удаляем старые статусные метки
-                  const oldStatusLabels = satelliteIssue.labels
-                    .filter(label => label.name.startsWith('status/') && label.name !== newStatusLabel)
-                    .map(label => label.name);
-                  
-                  for (const oldLabel of oldStatusLabels) {
-                    await fetch(
-                      `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels/${encodeURIComponent(oldLabel)}`,
-                      {
-                        method: 'DELETE',
-                        headers: {
-                          'Authorization': `token ${process.env.HUB_PAT}`,
-                          'Accept': 'application/vnd.github.v3+json'
-                        }
-                      }
-                    );
-                  }
-                  
-                  // Добавляем новую статусную метку
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/labels`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify([newStatusLabel])
-                    }
-                  );
+                );
+
+                if (!response.ok) {
+                  throw new Error(`Failed to update satellite issue: ${response.status}`);
                 }
-                
-                // Если задача завершена в Hub, закрываем в Satellite
-                if (status === 'closed') {
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify({
-                        state: 'closed'
-                      })
-                    }
-                  );
-                }
-                if (shouldReopen) {
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}`,
-                    {
-                      method: 'PATCH',
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify({
-                        state: 'open'
-                      })
-                    }
-                  );
-                  console.log('🔓 Reopened issue in Satellite');
-                }
-                
-                console.log(`✅ Synced status to Satellite #${satelliteIssueNumber}: ${status}`);
-                
+
+                console.log(`✅ Synced content to Satellite ${satelliteInfo.repo}#${satelliteInfo.number}`);
+
               } catch (error) {
-                console.log(`❌ Failed to sync status to Satellite: ${error.message}`);
+                console.log(`❌ Failed to sync content to Satellite: ${error.message}`);
               }
             }
