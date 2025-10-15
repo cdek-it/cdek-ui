@@ -48,6 +48,36 @@ jobs:
               return;
             }
 
+            async function findSatelliteIssueInComments(hubIssue) {
+              // Получаем комментарии issue
+              const commentsResponse = await fetch(
+                `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/issues/${hubIssue.number}/comments`,
+                {
+                  headers: {
+                    'Authorization': `token ${process.env.HUB_PAT}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                  }
+                }
+              );
+              
+              if (!commentsResponse.ok) {
+                console.log('❌ Failed to get comments');
+                return null;
+              }
+              
+              const comments = await commentsResponse.json();
+              
+              // Ищем в комментариях ссылку на Satellite issue
+              for (const comment of comments) {
+                const match = comment.body.match(/Satellite Issue.*#(\d+)/);
+                if (match) {
+                  return match;
+                }
+              }
+              
+              return null;
+            }
+
             // Ищем номер Satellite issue в комментариях
             const satelliteIssueMatch = await findSatelliteIssueInComments(issue);
             if (!satelliteIssueMatch) {
