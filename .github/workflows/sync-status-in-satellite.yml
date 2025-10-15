@@ -53,7 +53,7 @@ jobs:
             const satelliteIssueMatch = issueForComment.body.match(/Issue.*#(\d+)/);
             if (!satelliteIssueMatch) {
               console.log('❌ Satellite issue number not found in comment');
-              return null;
+              return satelliteIssueMatch;
             }
             
             const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
