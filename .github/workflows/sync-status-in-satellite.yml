@@ -28,14 +28,14 @@ jobs:
               }
               
               // Ищем номер Satellite issue в комментариях
-              const satelliteIssueMatch = issueForComment.body.match(/Satellite Issue.*#(\d+)/);
+              const satelliteIssueMatch = await findSatelliteIssueInComments(issueForComment);
               if (!satelliteIssueMatch) {
-                console.log('❌ Satellite issue reference not found in comment issue');
+                console.log('❌ Satellite issue reference not found in comments');
                 return;
               }
               
               const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-              const [satelliteOwner, satelliteRepoName] = '${{ github.repository }}'.split('/');
+              const [satelliteOwner, satelliteRepoName] = '${{ github.repository_owner }}/${{ github.event.repository.name }}'.split('/');
               
               await syncCommentToSatellite(comment, issueForComment, satelliteIssueNumber, satelliteOwner, satelliteRepoName);
               return;
@@ -47,7 +47,24 @@ jobs:
               console.log('ℹ️ Not a Hub issue, skipping sync');
               return;
             }
-
+            
+            // Ищем номер Satellite issue в комментариях
+            const satelliteIssueMatch = await findSatelliteIssueInComments(issue);
+            if (!satelliteIssueMatch) {
+              console.log('❌ Satellite issue reference not found in comments');
+              return;
+            }
+            
+            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
+            const satelliteRepo = '${{ github.repository_owner }}/${{ github.event.repository.name }}';
+            
+            // Определяем тип события для синхронизации лейблов
+            if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
+              await syncLabelsToSatellite(issue, satelliteIssueNumber, satelliteRepo, label);
+            }
+            
+            await syncStatusToSatellite(issue, satelliteIssueNumber, satelliteRepo);
+            
             async function findSatelliteIssueInComments(hubIssue) {
               // Получаем комментарии issue
               const commentsResponse = await fetch(
@@ -77,23 +94,6 @@ jobs:
               
               return null;
             }
-
-            // Ищем номер Satellite issue в комментариях
-            const satelliteIssueMatch = await findSatelliteIssueInComments(issue);
-            if (!satelliteIssueMatch) {
-              console.log('❌ Satellite issue reference not found in comments');
-              return;
-            }
-            
-            const satelliteIssueNumber = parseInt(satelliteIssueMatch[1]);
-            const satelliteRepo = '${{ github.repository }}';
-            
-            // Определяем тип события для синхронизации лейблов
-            if (context.eventName === 'issues' && (context.payload.action === 'labeled' || context.payload.action === 'unlabeled')) {
-              await syncLabelsToSatellite(issue, satelliteIssueNumber, satelliteRepo, label);
-            }
-            
-            await syncStatusToSatellite(issue, satelliteIssueNumber, satelliteRepo);
             
             async function syncStatusToSatellite(hubIssue, satelliteIssueNumber, satelliteRepo) {
               let status = '';
@@ -223,32 +223,6 @@ jobs:
                   console.log('✅ Added labels to Satellite: ' + labelsToAdd.join(', '));
                 }
                 
-                // Создаем комментарий о синхронизации лейблов
-                if (labelsToRemove.length > 0 || labelsToAdd.length > 0) {
-                  const commentLines = [];
-                  
-                  if (labelsToAdd.length > 0) {
-                    commentLines.push('**Добавлены**: `' + labelsToAdd.join('`, `') + '`');
-                  }
-                  
-                  if (labelsToRemove.length > 0) {
-                    commentLines.push('**Удалены**: `' + labelsToRemove.join('`, `') + '`');
-                  }
-                  
-                  // Добавляем информацию о текущих синхронизированных лейблах
-                  const currentSyncInfo = [];
-                  for (const prefix of syncPrefixes) {
-                    const labelForPrefix = labelsToSync.find(label => label.startsWith(prefix));
-                    if (labelForPrefix) {
-                      currentSyncInfo.push(`**${prefix}**: \`${labelForPrefix}\``);
-                    }
-                  }
-                  
-                  if (currentSyncInfo.length > 0) {
-                    commentLines.push('**Текущие синхронизированные лейблы**:\n' + currentSyncInfo.join('\n'));
-                  }
-                }
-                
                 console.log(`✅ Synced labels to Satellite #${satelliteIssueNumber}`);
                 
               } catch (error) {
@@ -306,25 +280,6 @@ jobs:
             
             async function updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteRepo, shouldReopen = false) {
               try {
-                // Обновляем комментарий в Satellite используя PAT
-                await fetch(
-                  `https://api.github.com/repos/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `token ${process.env.HUB_PAT}`,
-                      'Content-Type': 'application/json',
-                      'Accept': 'application/vnd.github.v3+json'
-                    },
-                    body: JSON.stringify({
-                      body: '**🔄 Статус обновлен из Hub**\n\n' +
-                            '**Hub Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
-                            '**Статус**: ' + statusMessage + '\n' +
-                            '**Время**: ' + new Date().toLocaleString()
-                    })
-                  }
-                );
-                
                 // Обновляем метки статуса в Satellite
                 const statusLabels = {
                   'in-progress': 'status/in-progress'
@@ -416,7 +371,6 @@ jobs:
                   );
                   console.log('🔓 Reopened issue in Satellite');
                 }
-                
                 
                 console.log(`✅ Synced status to Satellite #${satelliteIssueNumber}: ${status}`);
                 
