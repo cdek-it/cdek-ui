@@ -73,7 +73,7 @@ jobs:
                   status = 'open';
                   statusMessage = '🔄 Переоткрыто в Hub';
                   shouldReopen = true;
-                } else {
+                } else if (hubIssue.state === 'open') {
                   // Проверяем наличие лейбла status/in-progress
                   const hasInProgressLabel = hubIssue.labels.some(label => label.name === 'status/in-progress');
                   if (hasInProgressLabel) {
