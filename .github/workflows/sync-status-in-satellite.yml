@@ -213,21 +213,6 @@ jobs:
                   if (currentSyncInfo.length > 0) {
                     commentLines.push('**Текущие синхронизированные лейблы**:\n' + currentSyncInfo.join('\n'));
                   }
-                  
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify({
-                        body: commentBody + commentLines.join('\n\n')
-                      })
-                    }
-                  );
                 }
                 
                 console.log(`✅ Synced labels to Satellite #${satelliteIssueNumber}`);
