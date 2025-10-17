@@ -291,26 +291,6 @@ jobs:
             
             async function updateSatelliteStatus(satelliteIssueNumber, status, statusMessage, hubIssue, satelliteOwner, satelliteRepo, shouldReopen = false) {
               try {
-                // Обновляем комментарий в Satellite используя PAT
-                await fetch(
-                  `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `token ${process.env.HUB_PAT}`,
-                      'Content-Type': 'application/json',
-                      'Accept': 'application/vnd.github.v3+json'
-                    },
-                    body: JSON.stringify({
-                      body: '**🔄 Статус обновлен из Hub**\n\n' +
-                            '**Hub**: `project-hub`\n' +
-                            '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
-                            '**Статус**: ' + statusMessage + '\n' +
-                            '**Время**: ' + new Date().toLocaleString()
-                    })
-                  }
-                );
-                
                 // Обновляем метки статуса в Satellite
                 const statusLabels = {
                   'in-progress': 'status/in-progress'
