@@ -186,10 +186,6 @@ jobs:
                 
                 // Создаем комментарий о синхронизации лейблов
                 if (labelsToRemove.length > 0 || labelsToAdd.length > 0) {
-                  const commentBody = '**🏷️ Лейблы синхронизированы из Hub**\n\n' +
-                                    '**Hub**: `project-hub`\n' +
-                                    '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
-                                    '**Время**: ' + new Date().toLocaleString() + '\n\n';
                   
                   const commentLines = [];
                   
@@ -213,22 +209,6 @@ jobs:
                   if (currentSyncInfo.length > 0) {
                     commentLines.push('**Текущие синхронизированные лейблы**:\n' + currentSyncInfo.join('\n'));
                   }
-                  
-                  await fetch(
-                    `https://api.github.com/repos/${satelliteOwner}/${satelliteRepo}/issues/${satelliteIssueNumber}/comments`,
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `token ${process.env.HUB_PAT}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                      },
-                      body: JSON.stringify({
-                        body: commentBody + commentLines.join('\n\n')
-                      })
-                    }
-                  );
-                }
                 
                 console.log(`✅ Synced labels to Satellite #${satelliteIssueNumber}`);
                 
