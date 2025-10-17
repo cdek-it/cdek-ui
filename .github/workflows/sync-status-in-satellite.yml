@@ -52,7 +52,7 @@ jobs:
             // Ищем номер Satellite issue в комментариях
             const satelliteIssueMatch = issueForComment.body.match(/Issue.*#(\d+)/);
             if (!satelliteIssueMatch) {
-              console.log('❌ Satellite issue number not found in comment');
+              console.log('❌ Satellite issue number not found in comment' + context.payload.issue.body.match());
               return satelliteIssueMatch;
             }
             
