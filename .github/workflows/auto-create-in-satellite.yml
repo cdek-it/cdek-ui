@@ -89,22 +89,27 @@ jobs:
                 
                 const satelliteIssue = await response.json();
                 
+                // Обновляем описание Hub issue вместо создания комментария
+                const updatedBody = hubIssue.body + '\n\n---\n\n' +
+                  '## 📡 Satellite Information\n\n' +
+                  '✅ **Задача автоматически создана в satellite!**\n\n' +
+                  '**Satellite**: `' + targetRepo + '`\n' +
+                  '**Satellite Issue**: [#' + satelliteIssue.number + '](' + satelliteIssue.html_url + ')\n' +
+                  '**Auto-created**: ' + new Date().toLocaleString() + '\n' +
+                  '**Статус**: 🟢 Активно в satellite';
+                
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: hubIssue.number,
+                  body: updatedBody
+                });
+                
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: hubIssue.number,
                   labels: ['state/routed']
-                });
-                
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: hubIssue.number,
-                  body: '✅ **Задача автоматически создана в satellite!**\n\n' +
-                        '**Satellite**: `' + targetRepo + '`\n' +
-                        '**Satellite Issue**: [#' + satelliteIssue.number + '](' + satelliteIssue.html_url + ')\n' +
-                        '**Auto-created**: ' + new Date().toLocaleString() + '\n\n' +
-                        '**Статус**: 🟢 Активно в satellite'
                 });
                 
                 console.log('✅ Created issue in ' + targetRepo + ': #' + satelliteIssue.number);
