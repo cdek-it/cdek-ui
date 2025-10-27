@@ -14,7 +14,8 @@ Satellite (yandex-test, ozon-test, wildberries-test) - репозитории д
 
 1. Основное создание в Hub
 
-**Где**: https://github.com/cdek-it/project-hub/issues/new
+**Где**: 
+- https://github.com/cdek-it/project-hub/issues/new
 
 **Что указывать**:
 - Title: Краткое описание задачи
