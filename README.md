@@ -13,7 +13,7 @@ Satellite (yandex-test, ozon-test, wildberries-test) - репозитории д
 ## 🚀 Создание задачи
 
 1. Основное создание в Hub
-markdown
+
 **Где**: https://github.com/cdek-it/project-hub/issues/new
 
 **Что указывать**:
