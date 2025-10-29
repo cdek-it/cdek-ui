@@ -162,6 +162,12 @@ jobs:
                     color: labelDef.color,
                     description: labelDef.description || ''
                   };
+
+                  const isTypeLabel = labelDef.name.startsWith('type/');
+                  if (isTypeLabel) {
+                    console.log(`🔍 Processing type label: ${labelDef.name}`);
+                    console.log(`   Color: ${labelData.color}, Description: ${labelData.description}`);
+                  }
                   
                   if (existingLabelNames.includes(labelDef.name)) {
                     // Обновляем существующую метку
@@ -180,6 +186,10 @@ jobs:
                       console.log(`🔁 Updated in ${{ matrix.satellite }}: ${labelDef.name}`);
                     } else {
                       throw new Error(`HTTP ${updateResponse.status}`);
+                    }
+                  } else {
+                      const errorText = await updateResponse.text();
+                      throw new Error(`HTTP ${updateResponse.status}: ${errorText}`);
                     }
                   } else {
                     // Создаем новую метку
