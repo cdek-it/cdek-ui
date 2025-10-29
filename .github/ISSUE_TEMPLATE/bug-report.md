@@ -1,7 +1,9 @@
 ---
 name: "\U0001F41E Отчет об ошибке"
+about: Исправление багов
+color: d73a4a
 description: Сообщить о проблеме в CDEK UI
-labels: ['needs: triage']
+labels: ["type/bug", "status/need-triage"]
 type: Bug
 body:
   - type: textarea
