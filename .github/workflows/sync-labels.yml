@@ -159,7 +159,8 @@ jobs:
                   const labelData = {
                     name: labelDef.name,
                     color: labelDef.color,
-                    description: labelDef.description || ''
+                    description: labelDef.description,
+                    keywords: labelDef.keywords || ''
                   };
                   
                   if (existingLabelNames.includes(labelDef.name)) {
