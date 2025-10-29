@@ -91,7 +91,7 @@ jobs:
     needs: sync-hub-labels
     strategy:
       matrix:
-        satellite: ['yandex-test', 'ozon-test', 'wildberries-test']
+        satellite: ['yandex-test', 'ozon-test', 'wildberries-test', 'wordpress', 'cdek-it.github.io', 'xstate-json-types', 'widget', 'sdk2.0', 'opencart', 'react-ui-kit', 'vue-ui-kit', 'yandex', 'ozon', 'wildberries', 'react-native-ui-kit', 'angular-ui-kit']
     
     steps:
       - name: Checkout Hub
