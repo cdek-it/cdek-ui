@@ -203,6 +203,93 @@
         "color": "b60205",
         "description": "Issue auto created"
       }
+    ],
+    "satellite": [
+      {
+        "name": "satellite/yandex-test",
+        "color": "bfdadc",
+        "description": "Относится к yandex"
+      },
+      {
+        "name": "satellite/ozon-test",
+        "color": "bfdadc",
+        "description": "Относится к ozon" 
+      },
+      {
+        "name": "satellite/wildberries-test",
+        "color": "bfdadc",
+        "description": "Относится к wildberries" 
+      },
+      {
+        "name": "satellite/wildberries",
+        "color": "bfdadc",
+        "description": "Относится к wildberries" 
+      },
+      {
+        "name": "satellite/ozon",
+        "color": "bfdadc",
+        "description": "Относится к ozon" 
+      },
+      {
+        "name": "satellite/yandex",
+        "color": "bfdadc",
+        "description": "Относится к yandex" 
+      },
+      {
+        "name": "satellite/wordpress",
+        "color": "bfdadc",
+        "description": "Относится к wordpress" 
+      },
+      {
+        "name": "satellite/cdek-it.github.io",
+        "color": "bfdadc",
+        "description": "Относится к cdek-it.github.io" 
+      },
+      {
+        "name": "satellite/xstate-json-types",
+        "color": "bfdadc",
+        "description": "Относится к xstate-json-types" 
+      },
+      {
+        "name": "satellite/widget",
+        "color": "bfdadc",
+        "description": "Относится к widget" 
+      },
+      {
+        "name": "satellite/sdk2.0",
+        "color": "bfdadc",
+        "description": "Относится к sdk2.0" 
+      },
+      {
+        "name": "satellite/opencart",
+        "color": "bfdadc",
+        "description": "Относится к opencart" 
+      },
+      {
+        "name": "satellite/react-ui-kit",
+        "color": "bfdadc",
+        "description": "Относится к react-ui-kit" 
+      },
+      {
+        "name": "satellite/vue-ui-kit",
+        "color": "bfdadc",
+        "description": "Относится к vue-ui-kit" 
+      },
+      {
+        "name": "satellite/react-ui-kit",
+        "color": "bfdadc",
+        "description": "Относится к react-ui-kit" 
+      },
+      {
+        "name": "satellite/react-native-ui-kit",
+        "color": "bfdadc",
+        "description": "Относится к react-native-ui-kit" 
+      },
+      {
+        "name": "satellite/angular-ui-kit",
+        "color": "bfdadc",
+        "description": "Относится к angular-ui-kit" 
+      }
     ]
   },
   "rules": {
