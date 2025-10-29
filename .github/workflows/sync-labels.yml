@@ -149,6 +149,13 @@ jobs:
               // Создаем или обновляем метки
               for (const labelDef of allLabels) {
                 try {
+                
+                  if (labelDef.name.startsWith('satellite/')) {
+                    skipped++;
+                    console.log(`⏭️ Skipped satellite label: ${labelDef.name}`);
+                    continue;
+                  }
+                  
                   const labelData = {
                     name: labelDef.name,
                     color: labelDef.color,
