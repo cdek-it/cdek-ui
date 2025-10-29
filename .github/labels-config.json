@@ -70,11 +70,6 @@
     ],
     "effort": [
       {
-        "name": "effort/xs",
-        "color": "c2e0c6", 
-        "description": "<2 часов, 1-5 строк кода"
-      },
-      {
         "name": "effort/s",
         "color": "7057ff", 
         "description": "<1 дня, простые компоненты"
