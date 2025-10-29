@@ -150,7 +150,7 @@ jobs:
             try {
               // Используем actions/github-script с кастомным токеном
               // Создаем кастомный запрос с PAT токеном
-              const response = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels?per_page=100`, {
+              const response = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels?per_page=200`, {
                 method: 'GET',
                 headers: {
                   'Authorization': `token ${process.env.HUB_PAT}`,
