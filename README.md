@@ -4,7 +4,7 @@
 
 Hub-Satellite модель - это централизованная система управления задачами, где:
 
-Hub (project-hub) - центральный репозиторий для планирования и обсуждения
+Hub (cdek-ui) - центральный репозиторий для планирования и обсуждения
 
 Satellite (yandex-test, ozon-test, wildberries-test) - репозитории для реализации
 
@@ -15,7 +15,7 @@ Satellite (yandex-test, ozon-test, wildberries-test) - репозитории д
 1. Основное создание в Hub
 
 **Где**: 
-- https://github.com/cdek-it/project-hub/issues/new
+- https://github.com/cdek-it/cdek-ui/issues/new
 
 **Что указывать**:
 - Title: Краткое описание задачи
