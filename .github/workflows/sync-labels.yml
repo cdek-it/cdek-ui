@@ -37,6 +37,8 @@ jobs:
               }
             }
             
+            const configLabelNames = allLabels.map(label => label.name);
+            
             console.log(`📋 Processing ${allLabels.length} labels...`);
             
             // Получаем существующие метки в Hub
@@ -54,7 +56,26 @@ jobs:
             // Создаем или обновляем метки в Hub
             let created = 0;
             let updated = 0;
+            let deleted = 0;
             
+            // Удаляем метки, которых нет в конфиге
+            for (const existingLabel of existingLabels) {
+              if (!configLabelNames.includes(existingLabel.name)) {
+                try {
+                  await github.rest.issues.deleteLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: existingLabel.name
+                  });
+                  deleted++;
+                  console.log(`🗑️ Deleted from Hub: ${existingLabel.name}`);
+                } catch (error) {
+                  console.log(`❌ Error deleting ${existingLabel.name}: ${error.message}`);
+                }
+              }
+            }
+            
+            // Создаем или обновляем метки из конфига
             for (const labelDef of allLabels) {
               try {
                 if (existingLabelNames.includes(labelDef.name)) {
@@ -83,7 +104,7 @@ jobs:
               }
             }
             
-            console.log(`🎉 Hub sync completed! Created: ${created}, Updated: ${updated}`);
+            console.log(`🎉 Hub sync completed! Created: ${created}, Updated: ${updated}, Deleted: ${deleted}`);
 
   # Синхронизация в Satellites
   sync-satellite-labels:
@@ -91,7 +112,7 @@ jobs:
     needs: sync-hub-labels
     strategy:
       matrix:
-        satellite: ['yandex-test', 'ozon-test', 'wildberries-test', 'wordpress', 'cdek-it.github.io', 'xstate-json-types', 'widget', 'sdk2.0', 'opencart', 'react-ui-kit', 'vue-ui-kit', 'yandex', 'ozon', 'wildberries', 'react-native-ui-kit', 'angular-ui-kit']
+        satellite: ['yandex-test', 'ozon-test', 'wildberries-test']
     
     steps:
       - name: Checkout Hub
@@ -122,6 +143,8 @@ jobs:
               }
             }
             
+            const configLabelNames = allLabels.map(label => label.name);
+            
             console.log(`📋 Processing ${allLabels.length} labels for ${{ matrix.satellite }}...`);
             
             try {
@@ -146,9 +169,42 @@ jobs:
               let created = 0;
               let updated = 0;
               let skipped = 0;
+              let deleted = 0;
               let failed = 0;
               
-              // Создаем или обновляем метки
+              // Удаляем метки, которых нет в конфиге (кроме системных)
+              for (const existingLabel of existingLabels) {
+                if (!configLabelNames.includes(existingLabel.name) && 
+                    !existingLabel.name.startsWith('satellite/') &&
+                    existingLabel.name !== 'state/from-hub' &&
+                    existingLabel.name !== 'state/routed' &&
+                    existingLabel.name !== 'state/auto-created') {
+                  try {
+                    const deleteResponse = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels/${encodeURIComponent(existingLabel.name)}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `token ${process.env.HUB_PAT}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                      }
+                    });
+                    
+                    if (deleteResponse.ok) {
+                      deleted++;
+                      console.log(`🗑️ Deleted from ${{ matrix.satellite }}: ${existingLabel.name}`);
+                    } else {
+                      throw new Error(`HTTP ${deleteResponse.status}`);
+                    }
+                    
+                    // Задержка между удалениями
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                  } catch (error) {
+                    console.log(`❌ Error deleting ${existingLabel.name} from ${{ matrix.satellite }}: ${error.message}`);
+                  }
+                }
+              }
+              
+              // Создаем или обновляем метки из конфига
               for (const labelDef of allLabels) {
                 try {
                   // Пропускаем satellite/ лейблы
@@ -164,13 +220,6 @@ jobs:
                     description: labelDef.description || ''
                   };
                   
-                  // Детальное логирование для type/ лейблов
-                  const isTypeLabel = labelDef.name.startsWith('type/');
-                  if (isTypeLabel) {
-                    console.log(`🔍 Processing type label: ${labelDef.name}`);
-                    console.log(`   Color: ${labelData.color}, Description: ${labelData.description}`);
-                  }
-                  
                   if (existingLabelNames.includes(labelDef.name)) {
                     // Обновляем существующую метку
                     const updateResponse = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels/${encodeURIComponent(labelDef.name)}`, {
@@ -185,11 +234,7 @@ jobs:
                     
                     if (updateResponse.ok) {
                       updated++;
-                      if (isTypeLabel) {
-                        console.log(`✅ Successfully updated type label: ${labelDef.name}`);
-                      } else {
-                        console.log(`🔁 Updated in ${{ matrix.satellite }}: ${labelDef.name}`);
-                      }
+                      console.log(`🔁 Updated in ${{ matrix.satellite }}: ${labelDef.name}`);
                     } else {
                       const errorText = await updateResponse.text();
                       throw new Error(`HTTP ${updateResponse.status}: ${errorText}`);
@@ -208,11 +253,7 @@ jobs:
                     
                     if (createResponse.ok) {
                       created++;
-                      if (isTypeLabel) {
-                        console.log(`✅ Successfully created type label: ${labelDef.name}`);
-                      } else {
-                        console.log(`✅ Created in ${{ matrix.satellite }}: ${labelDef.name}`);
-                      }
+                      console.log(`✅ Created in ${{ matrix.satellite }}: ${labelDef.name}`);
                     } else {
                       const errorText = await createResponse.text();
                       throw new Error(`HTTP ${createResponse.status}: ${errorText}`);
@@ -225,16 +266,10 @@ jobs:
                 } catch (error) {
                   failed++;
                   console.log(`❌ Error with ${labelDef.name} in ${{ matrix.satellite }}: ${error.message}`);
-                  
-                  // Детальный лог для type/ лейблов
-                  if (labelDef.name.startsWith('type/')) {
-                    console.log(`💥 TYPE LABEL FAILED: ${labelDef.name}`);
-                    console.log(`   Error details: ${JSON.stringify(error, null, 2)}`);
-                  }
                 }
               }
               
-              console.log(`🎉 ${{ matrix.satellite }} sync completed! Created: ${created}, Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}`);
+              console.log(`🎉 ${{ matrix.satellite }} sync completed! Created: ${created}, Updated: ${updated}, Deleted: ${deleted}, Skipped: ${skipped}, Failed: ${failed}`);
               
               if (failed > 0) {
                 throw new Error(`Failed to sync ${failed} labels to ${{ matrix.satellite }}`);
