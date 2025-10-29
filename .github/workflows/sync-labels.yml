@@ -145,6 +145,7 @@ jobs:
               
               let created = 0;
               let updated = 0;
+              let skipped = 0;
               
               // Создаем или обновляем метки
               for (const labelDef of allLabels) {
