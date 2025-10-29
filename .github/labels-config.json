@@ -69,6 +69,11 @@
       }
     ],
     "effort": [
+       {
+        "name": "effort/xs",
+        "color": "c2e0c6", 
+        "description": "<2 часов, 1-5 строк кода"
+      },
       {
         "name": "effort/s",
         "color": "7057ff", 
@@ -207,12 +212,17 @@
       },
       {
         "name": "satellite/ozon-test",
-        "color": "d4c5f9",
+        "color": "bfdadc",
         "description": "Относится к ozon" 
       },
       {
         "name": "satellite/wildberries-test",
-        "color": "d876e3",
+        "color": "bfdadc",
+        "description": "Относится к wildberries" 
+      },
+      {
+        "name": "satellite/wildberries",
+        "color": "bfdadc",
         "description": "Относится к wildberries" 
       }
     ]
