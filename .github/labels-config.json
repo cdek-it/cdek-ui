@@ -203,28 +203,6 @@
         "color": "b60205",
         "description": "Issue auto created"
       }
-    ],
-    "satellite": [
-      {
-        "name": "satellite/yandex-test",
-        "color": "bfdadc",
-        "description": "Относится к yandex"
-      },
-      {
-        "name": "satellite/ozon-test",
-        "color": "bfdadc",
-        "description": "Относится к ozon" 
-      },
-      {
-        "name": "satellite/wildberries-test",
-        "color": "bfdadc",
-        "description": "Относится к wildberries" 
-      },
-      {
-        "name": "satellite/wildberries",
-        "color": "bfdadc",
-        "description": "Относится к wildberries" 
-      }
     ]
   },
   "rules": {
