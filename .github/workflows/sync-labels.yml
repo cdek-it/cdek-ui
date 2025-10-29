@@ -16,6 +16,8 @@ jobs:
         
       - name: Sync labels in Hub repository
         uses: actions/github-script@v7
+        env:
+          HUB_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
         with:
           script: |
             const fs = require('fs');
@@ -128,7 +130,7 @@ jobs:
               const response = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels`, {
                 method: 'GET',
                 headers: {
-                  'Authorization': `token ${{ secrets.SYNC_ACCESS_TOKEN }}`,
+                  'Authorization': `token ${process.env.HUB_PAT}`,
                   'Accept': 'application/vnd.github.v3+json',
                   'User-Agent': 'GitHub-Label-Sync'
                 }
@@ -158,7 +160,7 @@ jobs:
                     const updateResponse = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels/${encodeURIComponent(labelDef.name)}`, {
                       method: 'PATCH',
                       headers: {
-                        'Authorization': `token ${{ secrets.SYNC_ACCESS_TOKEN }}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Accept': 'application/vnd.github.v3+json',
                         'Content-Type': 'application/json'
                       },
@@ -176,7 +178,7 @@ jobs:
                     const createResponse = await fetch(`https://api.github.com/repos/${context.repo.owner}/${{ matrix.satellite }}/labels`, {
                       method: 'POST',
                       headers: {
-                        'Authorization': `token ${{ secrets.SYNC_ACCESS_TOKEN }}`,
+                        'Authorization': `token ${process.env.HUB_PAT}`,
                         'Accept': 'application/vnd.github.v3+json',
                         'Content-Type': 'application/json'
                       },
