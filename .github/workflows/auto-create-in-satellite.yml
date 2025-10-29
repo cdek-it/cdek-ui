@@ -38,8 +38,21 @@ jobs:
               try {
                 const repoMap = {
                   'yandex-test': 'yandex-test',
-                  'ozon-test': 'ozon-test',
-                  'wildberries-test': 'wildberries-test'
+                  'ozon': 'ozon-test',
+                  'wildberries-test': 'wildberries-test',
+                  'yandex': 'yandex',
+                  'ozon': 'ozon',
+                  'wildberries': 'wildberries',
+                  'wordpress': 'wordpress',
+                  'cdek-it.github.io': 'cdek-it.github.io',
+                  'xstate-json-types': 'xstate-json-types',
+                  'widget': 'widget',
+                  'sdk2.0': 'sdk2.0',
+                  'opencart': 'opencart',
+                  'react-ui-kit': 'react-ui-kit',
+                  'vue-ui-kit': 'vue-ui-kit',
+                  'react-native-ui-kit': 'react-native-ui-kit',
+                  'angular-ui-kit': 'angular-ui-kit'
                 };
                 
                 const targetRepo = repoMap[satelliteName];
