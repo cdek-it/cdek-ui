@@ -175,7 +175,6 @@ jobs:
               // Удаляем метки, которых нет в конфиге (кроме системных)
               for (const existingLabel of existingLabels) {
                 if (!configLabelNames.includes(existingLabel.name) && 
-                    !existingLabel.name.startsWith('satellite/') &&
                     existingLabel.name !== 'state/from-hub' &&
                     existingLabel.name !== 'state/routed' &&
                     existingLabel.name !== 'state/auto-created') {
