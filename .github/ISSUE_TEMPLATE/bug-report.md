@@ -1,3 +1,4 @@
+---
 name: "\U0001F41E Отчет об ошибке"
 description: Сообщить о проблеме в CDEK UI
 labels: ['needs: triage']
@@ -45,3 +46,4 @@ body:
           required: true
         - label: Предоставленный пример воспроизведения является [минимальным воспроизводимым примером](https://stackoverflow.com/help/minimal-reproducible-example) ошибки.
           required: true
+---
