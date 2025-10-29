@@ -187,7 +187,7 @@ jobs:
                 // Создаем комментарий о синхронизации лейблов
                 if (labelsToRemove.length > 0 || labelsToAdd.length > 0) {
                   const commentBody = '**🏷️ Лейблы синхронизированы из Hub**\n\n' +
-                                    '**Hub**: `project-hub`\n' +
+                                    '**Hub**: `cdek-ui`\n' +
                                     '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                                     '**Время**: ' + new Date().toLocaleString() + '\n\n';
                   
@@ -239,7 +239,7 @@ jobs:
                 const satelliteOwner = '${{ github.repository_owner }}';
                 
                 const commentBody = '**💬 Комментарий из Hub**\n\n' +
-                                    '**Hub**: `project-hub`\n' +
+                                    '**Hub**: `cdek-ui`\n' +
                                     '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                                     '**Автор**: @' + hubComment.user.login + '\n' +
                                     '**Время**: ' + new Date(hubComment.created_at).toLocaleString() + '\n\n' +
@@ -288,7 +288,7 @@ jobs:
                     },
                     body: JSON.stringify({
                       body: '**🔄 Статус обновлен из Hub**\n\n' +
-                            '**Hub**: `project-hub`\n' +
+                            '**Hub**: `cdek-ui`\n' +
                             '**Issue**: [#' + hubIssue.number + '](' + hubIssue.html_url + ')\n' +
                             '**Статус**: ' + statusMessage + '\n' +
                             '**Время**: ' + new Date().toLocaleString()
