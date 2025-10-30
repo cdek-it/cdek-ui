@@ -6,7 +6,7 @@ Hub-Satellite модель - это централизованная систе�
 
 Hub (cdek-ui) - центральный репозиторий для планирования и обсуждения
 
-Satellite (yandex-test, ozon-test, wildberries-test) - репозитории для реализации
+Satellite (react-ui-kit, vue-ui-kit, react-native-ui-kit, angular-ui-kit) - репозитории для реализации
 
 Правило №1: Все задачи создаются ТОЛЬКО в Hub!
 
@@ -41,9 +41,10 @@ Satellite (yandex-test, ozon-test, wildberries-test) - репозитории д
 1. Satellite назначение
 
 ```
-satellite/yandex-test - Задача для Yandex репозитория
-satellite/ozon-test - Задача для Ozon репозитория  
-satellite/wildberries-test - Задача для Wildberries репозитория
+satellite/angular-ui-kit - Задача для react-ui-kit репозитория
+satellite/vue-ui-kit - Задача для vue-ui-kit репозитория
+satellite/react-ui-kit - Задача для react-ui-kit репозитория
+satellite/react-native-ui-kit - Задача для react-native-ui-kit репозитория
 ```
 
 2. Статусы
