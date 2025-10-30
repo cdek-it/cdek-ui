@@ -112,7 +112,7 @@ jobs:
     needs: sync-hub-labels
     strategy:
       matrix:
-        satellite: ['yandex-test', 'ozon-test', 'wildberries-test', 'react-ui-kit', 'vue-ui-kit', 'react-native-ui-kit', 'angular-ui-kit']
+        satellite: ['react-ui-kit', 'vue-ui-kit', 'react-native-ui-kit', 'angular-ui-kit']
     
     steps:
       - name: Checkout Hub
