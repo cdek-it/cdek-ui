@@ -1,4 +1,4 @@
-name: Auto Milestone Management
+name: Auto Milestone & Label Management
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - 'release/v*'
   pull_request:
     types: [opened, synchronize, reopened, labeled, edited]
-  issues:
-    types: [opened, edited, reopened, closed]
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -15,14 +15,14 @@ permissions:
   pull-requests: write
 
 jobs:
-  manage-milestones:
+  manage-milestones-and-labels:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Auto milestone management
+      - name: Auto milestone and label management
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
@@ -32,79 +32,114 @@ jobs:
             const ref = context.ref || "";
             const isReleaseBranch = ref.includes("refs/heads/release/v");
 
-            // --- 🔹 1. Создание milestone при новой релизной ветке ---
+            // --- 🔹 1. Создание label при новой релизной ветке ---
             if (context.eventName === "push" && isReleaseBranch) {
               const version = ref.split("release/")[1];
-              const milestoneTitle = `Release ${version}`;
-              console.log(`📦 Создаём milestone "${milestoneTitle}"`);
+              const labelName = `release:${version}`;
+              console.log(`🏷️ Проверяем label "${labelName}"`);
 
-              // Проверяем, существует ли milestone
-              const existing = await github.rest.issues.listMilestones({ owner: org, repo });
-              if (!existing.data.find(m => m.title === milestoneTitle)) {
-                await github.rest.issues.createMilestone({
+              // Проверяем, есть ли label
+              const existingLabels = await github.rest.issues.listLabelsForRepo({ owner: org, repo });
+              if (!existingLabels.data.find(l => l.name === labelName)) {
+                await github.rest.issues.createLabel({
                   owner: org,
                   repo,
-                  title: milestoneTitle,
-                  description: `Автоматически создано для релизной ветки ${version}`,
+                  name: labelName,
+                  color: "0e8a16",
+                  description: `Автоматически создано для релиза ${version}`
                 });
-                console.log(`✅ Milestone "${milestoneTitle}" создан.`);
+                console.log(`✅ Label "${labelName}" создан.`);
               } else {
-                console.log(`ℹ️ Milestone "${milestoneTitle}" уже существует.`);
+                console.log(`ℹ️ Label "${labelName}" уже существует.`);
               }
               return;
             }
 
-            // --- 🔹 2. Назначение milestone на Issue/PR ---
-            const item = context.payload.issue || context.payload.pull_request;
-            if (!item) return;
+            // --- 🔹 2. Назначение label на Pull Request ---
+            if (context.eventName === "pull_request") {
+              const pr = context.payload.pull_request;
+              const branches = ["head", "base"]
+                .map(k => pr[k]?.ref)
+                .filter(Boolean);
 
-            const branches = ["head", "base"]
-              .map(key => item[key]?.ref)
-              .filter(Boolean);
+              const releaseBranch = branches.find(b => b.startsWith("release/v"));
+              if (!releaseBranch) {
+                console.log("ℹ️ PR не связан с релизной веткой.");
+                return;
+              }
 
-            const releaseBranch = branches.find(b => b.startsWith("release/v"));
-            if (!releaseBranch) {
-              console.log("ℹ️ Не найдена релизная ветка — пропускаем.");
+              const version = releaseBranch.split("release/")[1];
+              const labelName = `release:${version}`;
+
+              console.log(`🏷️ Добавляем label "${labelName}" к PR #${pr.number}`);
+              await github.rest.issues.addLabels({
+                owner: org,
+                repo,
+                issue_number: pr.number,
+                labels: [labelName]
+              });
               return;
             }
 
-            const version = releaseBranch.split("release/")[1];
-            const milestoneTitle = `Release ${version}`;
+            // --- 🔹 3. После публикации релиза — закрытие milestone и перенос незакрытых задач ---
+            if (context.eventName === "release" && context.payload.action === "published") {
+              const release = context.payload.release;
+              const tag = release.tag_name; // Например v1.1
+              const version = tag.replace(/^v/, "");
+              const currentMilestoneTitle = `Release ${version}`;
+              console.log(`🚀 Публикация релиза "${tag}", ищем milestone "${currentMilestoneTitle}"`);
 
-            const milestones = await github.rest.issues.listMilestones({ owner: org, repo });
-            const milestone = milestones.data.find(m => m.title === milestoneTitle);
+              // Получаем все milestone’ы
+              const milestones = await github.rest.issues.listMilestones({ owner: org, repo, state: "all" });
+              const current = milestones.data.find(m => m.title === currentMilestoneTitle);
+              if (!current) {
+                console.log(`⚠️ Milestone "${currentMilestoneTitle}" не найден.`);
+                return;
+              }
 
-            if (!milestone) {
-              console.log(`⚠️ Milestone "${milestoneTitle}" не найден.`);
-              return;
-            }
+              // Определяем следующий milestone по версии
+              const currentVersionNumber = parseFloat(version);
+              const nextMilestone = milestones.data.find(m => {
+                const match = m.title.match(/Release v?(\d+\.\d+)/);
+                if (!match) return false;
+                const v = parseFloat(match[1]);
+                return v > currentVersionNumber;
+              });
 
-            console.log(`🏷️ Назначаем milestone "${milestoneTitle}" для #${item.number}`);
+              console.log(`📦 Текущий milestone: ${currentMilestoneTitle}`);
+              console.log(`➡️ Следующий milestone: ${nextMilestone ? nextMilestone.title : "❌ не найден"}`);
 
-            await github.rest.issues.update({
-              owner: org,
-              repo,
-              issue_number: item.number,
-              milestone: milestone.number
-            });
+              // Получаем все задачи текущего milestone
+              const all = await github.rest.issues.listForRepo({
+                owner: org,
+                repo,
+                milestone: current.number,
+                state: "all",
+                per_page: 100
+              });
 
-            // --- 🔹 3. Автоматическое закрытие milestone ---
-            const all = await github.rest.issues.listForRepo({
-              owner: org,
-              repo,
-              milestone: milestone.number,
-              state: "all"
-            });
+              const openIssues = all.data.filter(i => i.state === "open");
+              console.log(`🔍 Найдено ${openIssues.length} открытых задач`);
 
-            const openIssues = all.data.filter(i => i.state === "open");
-            if (openIssues.length === 0 && milestone.state !== "closed") {
-              console.log(`🎉 Все задачи закрыты. Закрываем milestone "${milestoneTitle}".`);
+              // Переносим незакрытые задачи в следующий milestone
+              if (nextMilestone && openIssues.length > 0) {
+                for (const issue of openIssues) {
+                  await github.rest.issues.update({
+                    owner: org,
+                    repo,
+                    issue_number: issue.number,
+                    milestone: nextMilestone.number
+                  });
+                  console.log(`➡️ Задача #${issue.number} перенесена в ${nextMilestone.title}`);
+                }
+              }
+
+              // Закрываем текущий milestone
               await github.rest.issues.updateMilestone({
                 owner: org,
                 repo,
-                milestone_number: milestone.number,
+                milestone_number: current.number,
                 state: "closed"
               });
-            } else {
-              console.log(`🕐 Осталось открытых задач: ${openIssues.length}`);
+              console.log(`✅ Milestone "${currentMilestoneTitle}" закрыт.`);
             }
