@@ -18,7 +18,6 @@ jobs:
   manage-milestones-and-labels:
     runs-on: ubuntu-latest
 
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -31,180 +30,123 @@ jobs:
             const org = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Утилита: извлечь версию из строки (v1.2.3 → 1.2.3)
             function extractVersion(str) {
               const match = str.match(/^v?(\d+\.\d+(\.\d+)?)$/);
               return match ? match[1] : null;
             }
 
-            // Утилита: сравнить версии (1.10 > 1.2)
             function compareVersions(a, b) {
-              const partsA = a.split('.').map(Number);
-              const partsB = b.split('.').map(Number);
-              for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-                const pA = partsA[i] || 0;
-                const pB = partsB[i] || 0;
-                if (pA !== pB) return pA - pB;
+              const A = a.split('.').map(Number);
+              const B = b.split('.').map(Number);
+              for (let i = 0; i < Math.max(A.length, B.length); i++) {
+                const x = A[i] || 0;
+                const y = B[i] || 0;
+                if (x !== y) return x - y;
               }
               return 0;
             }
 
-            // 1. CREATE LABEL ПРИ ПУШЕ В release/v*
+            // 1) CREATE LABEL WHEN PUSHING release/v*
             if (context.eventName === 'push') {
-              const ref = context.ref; // refs/heads/release/v1.2.3
+              const ref = context.ref;
               if (!ref.startsWith('refs/heads/release/v')) return;
 
-
               const version = extractVersion(ref.replace('refs/heads/release/', ''));
-              if (!version) {
-                console.log(`⚠️ Не удалось извлечь версию из ветки: ${ref}`);
-                return;
-              }
+              if (!version) return;
 
               const labelName = `release:v${version}`;
-              console.log(`🏷️ Проверяем label "${labelName}"`);
+              console.log(`Checking label ${labelName}`);
 
-
-              try {
-                // Проверяем, есть ли label
-                const existingLabels = await github.rest.issues.listLabelsForRepo({ owner: org, repo });
-                if (!existingLabels.data.some(l => l.name === labelName)) {
-                  await github.rest.issues.createLabel({
-                    owner: org,
-                    repo,
-                    name: labelName,
-                    color: '0e8a16',
-                    description: `Автоматически создано для релиза v${version}`
-                  });
-                  console.log(`✅ Label "${labelName}" создан.`);
-                } else {
-                  console.log(`ℹ️ Label "${labelName}" уже существует.`);
-                }
-              } catch (err) {
-                console.error(`❌ Ошибка при работе с лейблом: ${err.message}`);
-                // Не прерываем workflow — продолжаем выполнение
-              }
-              return;
-            }
-
-            // 2. ПРИСВОИТЬ LABEL К PR, СВЯЗАННЫМ С release/v*
-            if (context.eventName === 'pull_request') {
-              const pr = context.payload.pull_request;
-              const headRef = pr.head.ref;   // source ветка
-              const baseRef = pr.base.ref;   // target ветка
-
-
-              // Ищем ветку release/v* среди source/target
-              const releaseBranchPattern = /^release\/v(\d+\.\d+(\.\d+)?)$/;
-              const headMatch = headRef.match(releaseBranchPattern);
-              const baseMatch = baseRef.match(releaseBranchPattern);
-
-
-              if (!headMatch && !baseMatch) {
-                console.log(`ℹ️ PR #${pr.number} не связан с release/v*. Пропускаем.`);
-                return;
-              }
-
-              const version = (headMatch || baseMatch)[1];
-              const labelName = `release:v${version}`;
-
-
-              console.log(`🔖 Добавляем label "${labelName}" к PR #${pr.number}`);
-
-
-              try {
-                const currentLabels = pr.labels.map(l => l.name);
-                if (!currentLabels.includes(labelName)) {
-                  await github.rest.issues.addLabels({
-                    owner: org,
-                    repo,
-                    issue_number: pr.number,
-                    labels: [labelName]
-                  });
-                  console.log(`✅ Лейбл "${labelName}" добавлен к PR #${pr.number}`);
-                } else {
-                  console.log(`ℹ️ Лейбл "${labelName}" уже есть у PR #${pr.number}`);
-                }
-              } catch (err) {
-                console.error(`❌ Ошибка при добавлении лейбла к PR #${pr.number}: ${err.message}`);
-              }
-              return;
-            }
-
-            // 3. ПОСЛЕ ПУБЛИКАЦИИ РЕЛИЗА: закрыть Milestone и перенести задачи
-            if (context.eventName === 'release' && context.payload.action === 'published') {
-              const tag = context.payload.release.tag_name;
-              if (!tag.startsWith('v')) {
-                console.log(`⚠️ Тег релиза не начинается с 'v': ${tag}. Пропускаем.`);
-                return;
-              }
-
-              const version = extractVersion(tag);
-              if (!version) {
-                console.log(`⚠️ Не удалось извлечь версию из тега: ${tag}`);
-                return;
-              }
-
-              const milestoneTitle = `v${version}`; // Формат: v1.2.3
-              console.log(`🚀 Публикация релиза "${tag}", ищем milestone "${milestoneTitle}"`);
-
-
-              try {
-                // Получаем все Milestone
-                const milestones = await github.rest.issues.listMilestones({ owner: org, repo, state: 'all' });
-
-                // Находим текущий Milestone
-                const current = milestones.data.find(m => m.title === milestoneTitle);
-                if (!current) {
-                  console.log(`⚠️ Milestone "${milestoneTitle}" не найден.`);
-                  return;
-                }
-
-                // Сортируем Milestone по версии
-                const sortedMilestones = milestones.data
-                  .filter(m => m.title.match(/^v\d+\.\d+(\.\d+)?$/))
-                  .sort((a, b) => compareVersions(
-                    extractVersion(a.title),
-                    extractVersion(b.title)
-                  ));
-
-                // Определяем следующий Milestone
-                const nextIndex = sortedMilestones.findIndex(m => m.title === milestoneTitle) + 1;
-                const nextMilestone = nextIndex < sortedMilestones.length ? sortedMilestones[nextIndex] : null;
-
-
-                console.log(`📦 Текущий milestone: ${milestoneTitle}`);
-                console.log(`➡️ Следующий milestone: ${nextMilestone ? nextMilestone.title : '❌ не найден'}`);
-
-
-                // Получаем открытые задачи текущего Milestone
-                const openIssues = await github.rest.issues.listForRepo({
+              const labels = await github.rest.issues.listLabelsForRepo({ owner: org, repo });
+              if (!labels.data.some(l => l.name === labelName)) {
+                await github.rest.issues.createLabel({
                   owner: org,
                   repo,
-                  milestone: current.number,
-                  state: 'open',
-                  per_page: 100
+                  name: labelName,
+                  color: '0e8a16',
+                  description: `Автоматически создано для релиза v${version}`
                 });
+                console.log(`✅ Label ${labelName} создан`);
+              }
+              return;
+            }
 
-                console.log(`🔍 Найдено ${openIssues.data.length} открытых задач`);
+            // 2) APPLY LABEL TO PR RELATED TO release/v*
+            if (context.eventName === 'pull_request') {
+              const pr = context.payload.pull_request;
+              const branchList = [pr.head.ref, pr.base.ref];
 
+              const match = branchList
+                .map(b => b.match(/^release\/v(\d+\.\d+(\.\d+)?)$/))
+                .find(Boolean);
 
-                // Переносим открытые задачи в следующий Milestone
-                if (nextMilestone && openIssues.data.length > 0) {
-                  for (const issue of openIssues.data) {
-                    try {
-                      await github.rest.issues.update({
-                        owner: org,
-                        repo,
-                        issue_number: issue.number,
-                        milestone: nextMilestone.number
-                      });
-                      console.log(`➡️ Задача #${issue.number} перенесена в ${nextMilestone.title}`);
-                    } catch (err) {
-                      console.error(`❌ Ошибка при переносе задачи #${issue.number}: ${err.message}`);
-                    }
-                  }
+              if (!match) return;
+
+              const version = match[1];
+              const labelName = `release:v${version}`;
+
+              if (!pr.labels.some(l => l.name === labelName)) {
+                await github.rest.issues.addLabels({
+                  owner: org,
+                  repo,
+                  issue_number: pr.number,
+                  labels: [labelName]
+                });
+                console.log(`✅ Added label ${labelName} to PR #${pr.number}`);
+              }
+              return;
+            }
+
+            // 3) ON RELEASE → CLOSE MILESTONE & MOVE OPEN ISSUES
+            if (context.eventName === 'release' && context.payload.action === 'published') {
+              const tag = context.payload.release.tag_name;
+              const version = extractVersion(tag);
+              if (!version) return;
+
+              const milestoneTitle = `v${version}`;
+              console.log(`Release published: ${tag}, searching milestone ${milestoneTitle}`);
+
+              const allMilestones = await github.rest.issues.listMilestones({ owner: org, repo, state: 'all' });
+              const current = allMilestones.data.find(m => m.title === milestoneTitle);
+              if (!current) {
+                console.log(`⚠️ Milestone ${milestoneTitle} not found`);
+                return;
+              }
+
+              const sorted = allMilestones.data
+                .filter(m => m.title.match(/^v\d+\.\d+(\.\d+)?$/))
+                .sort((a, b) => compareVersions(extractVersion(a.title), extractVersion(b.title)));
+
+              const index = sorted.findIndex(m => m.title === milestoneTitle);
+              const nextMilestone = sorted[index + 1];
+
+              const openIssues = await github.rest.issues.listForRepo({
+                owner: org,
+                repo,
+                milestone: current.number,
+                state: 'open',
+                per_page: 100
+              });
+
+              if (nextMilestone && openIssues.data.length > 0) {
+                for (const issue of openIssues.data) {
+                  await github.rest.issues.update({
+                    owner: org,
+                    repo,
+                    issue_number: issue.number,
+                    milestone: nextMilestone.number
+                  });
+                  console.log(`➡️ Перенесена задача #${issue.number} в ${nextMilestone.title}`);
                 }
+              }
 
-                // Закрываем текущий Milestone
-                await github.rest.issues
+              await github.rest.issues.updateMilestone({
+                owner: org,
+                repo,
+                milestone_number: current.number,
+                state: 'closed'
+              });
+
+              console.log(`🎉 Milestone ${milestoneTitle} закрыт`);
+              return;
+            }
