@@ -18,6 +18,7 @@ jobs:
   manage-milestones-and-labels:
     runs-on: ubuntu-latest
 
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -53,11 +54,16 @@ jobs:
               const ref = context.ref; // refs/heads/release/v1.2.3
               if (!ref.startsWith('refs/heads/release/v')) return;
 
+
               const version = extractVersion(ref.replace('refs/heads/release/', ''));
-              if (!version) return;
+              if (!version) {
+                console.log(`⚠️ Не удалось извлечь версию из ветки: ${ref}`);
+                return;
+              }
 
               const labelName = `release:v${version}`;
               console.log(`🏷️ Проверяем label "${labelName}"`);
+
 
               try {
                 // Проверяем, есть ли label
@@ -76,6 +82,7 @@ jobs:
                 }
               } catch (err) {
                 console.error(`❌ Ошибка при работе с лейблом: ${err.message}`);
+                // Не прерываем workflow — продолжаем выполнение
               }
               return;
             }
@@ -85,6 +92,7 @@ jobs:
               const pr = context.payload.pull_request;
               const headRef = pr.head.ref;   // source ветка
               const baseRef = pr.base.ref;   // target ветка
+
 
               // Ищем ветку release/v* среди source/target
               const releaseBranchPattern = /^release\/v(\d+\.\d+(\.\d+)?)$/;
@@ -103,6 +111,7 @@ jobs:
 
               console.log(`🔖 Добавляем label "${labelName}" к PR #${pr.number}`);
 
+
               try {
                 const currentLabels = pr.labels.map(l => l.name);
                 if (!currentLabels.includes(labelName)) {
@@ -117,7 +126,7 @@ jobs:
                   console.log(`ℹ️ Лейбл "${labelName}" уже есть у PR #${pr.number}`);
                 }
               } catch (err) {
-                console.error(`❌ Ошибка при добавлении лейбла: ${err.message}`);
+                console.error(`❌ Ошибка при добавлении лейбла к PR #${pr.number}: ${err.message}`);
               }
               return;
             }
@@ -125,13 +134,20 @@ jobs:
             // 3. ПОСЛЕ ПУБЛИКАЦИИ РЕЛИЗА: закрыть Milestone и перенести задачи
             if (context.eventName === 'release' && context.payload.action === 'published') {
               const tag = context.payload.release.tag_name;
-              if (!tag.startsWith('v')) return;
+              if (!tag.startsWith('v')) {
+                console.log(`⚠️ Тег релиза не начинается с 'v': ${tag}. Пропускаем.`);
+                return;
+              }
 
               const version = extractVersion(tag);
-              if (!version) return;
+              if (!version) {
+                console.log(`⚠️ Не удалось извлечь версию из тега: ${tag}`);
+                return;
+              }
 
-              const milestoneTitle = `v${version}`; // ← Важно: совпадает с созданием!
+              const milestoneTitle = `v${version}`; // Формат: v1.2.3
               console.log(`🚀 Публикация релиза "${tag}", ищем milestone "${milestoneTitle}"`);
+
 
               try {
                 // Получаем все Milestone
@@ -144,7 +160,7 @@ jobs:
                   return;
                 }
 
-                // Сортируем Milestone по версии (семантически)
+                // Сортируем Milestone по версии
                 const sortedMilestones = milestones.data
                   .filter(m => m.title.match(/^v\d+\.\d+(\.\d+)?$/))
                   .sort((a, b) => compareVersions(
@@ -171,3 +187,24 @@ jobs:
                 });
 
                 console.log(`🔍 Найдено ${openIssues.data.length} открытых задач`);
+
+
+                // Переносим открытые задачи в следующий Milestone
+                if (nextMilestone && openIssues.data.length > 0) {
+                  for (const issue of openIssues.data) {
+                    try {
+                      await github.rest.issues.update({
+                        owner: org,
+                        repo,
+                        issue_number: issue.number,
+                        milestone: nextMilestone.number
+                      });
+                      console.log(`➡️ Задача #${issue.number} перенесена в ${nextMilestone.title}`);
+                    } catch (err) {
+                      console.error(`❌ Ошибка при переносе задачи #${issue.number}: ${err.message}`);
+                    }
+                  }
+                }
+
+                // Закрываем текущий Milestone
+                await github.rest.issues
