@@ -112,24 +112,46 @@ jobs:
             // 3) После релиза: закрыть milestone и перенести задачи
             if (context.eventName === 'release' && context.payload.action === 'published') {
               const tag = context.payload.release.tag_name;
-              const version = extractVersion(tag);
-              if (!version) return;
 
-              const milestoneTitle = `v${version}`;
-              const allMilestones = await github.rest.issues.listMilestones({ owner: org, repo, state: 'all' });
-              const current = allMilestones.data.find(m => m.title === milestoneTitle);
+              function parseVersion(name) {
+                const m = name.match(/^v(\d+)\.(\d+)\.(\d+)$/);
+                return m ? { major: +m[1], minor: +m[2], patch: +m[3] } : null;
+              }
 
+              function isGreater(a, b) {
+                if (a.major !== b.major) return a.major > b.major;
+                if (a.minor !== b.minor) return a.minor > b.minor;
+                return a.patch > b.patch;
+              }
+
+              const currentVersion = parseVersion(tag);
+              if (!currentVersion) {
+                console.log(`⚠️ Tag ${tag} не похож на vX.Y.Z — перенос пропущен.`);
+                return;
+              }
+
+              const milestoneTitle = `v${currentVersion.major}.${currentVersion.minor}.${currentVersion.patch}`;
+              const { data: allMilestones } = await github.rest.issues.listMilestones({
+                owner: org,
+                repo,
+                state: 'all'
+              });
+
+              const current = allMilestones.find(m => m.title === milestoneTitle);
               if (!current) {
                 console.log(`⚠️ Milestone "${milestoneTitle}" не найден.`);
                 return;
               }
 
-              const releaseMilestones = allMilestones.data
-                .filter(m => extractVersion(m.title))
-                .sort((a, b) => compareVersions(extractVersion(a.title), extractVersion(b.title)));
+              // Находим следующий milestone по SemVer
+              const versions = allMilestones
+                .map(m => ({ m, v: parseVersion(m.title) }))
+                .filter(x => x.v && isGreater(x.v, currentVersion))
+                .sort((a, b) =>
+                  isGreater(a.v, b.v) ? 1 : -1
+                );
 
-              const nextIndex = releaseMilestones.findIndex(m => m.title === milestoneTitle) + 1;
-              const next = releaseMilestones[nextIndex];
+              const next = versions.length ? versions[0].m : null;
 
               const openIssues = await github.rest.issues.listForRepo({
                 owner: org,
@@ -149,6 +171,8 @@ jobs:
                   });
                   console.log(`➡️ #${issue.number} перенесён → ${next.title}`);
                 }
+              } else {
+                console.log(`⚠️ Следующий milestone не найден — задачи остаются в закрытом.`);
               }
 
               await github.rest.issues.updateMilestone({
@@ -160,3 +184,4 @@ jobs:
 
               console.log(`🎉 Milestone "${milestoneTitle}" закрыт.`);
             }
+
