@@ -1,0 +1,127 @@
+name: 🚀 Create Redmine Issue from GitHub
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-redmine-issue:
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'state/to-redmine'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Redmine Issue
+        uses: actions/github-script@v7
+        env:
+          REDMINE_API_KEY: ${{ secrets.REDMINE_API_KEY }}
+          REDMINE_URL: ${{ secrets.REDMINE_URL }}
+        with:
+          script: |
+            const { issue } = context.payload;
+            
+            console.log('🔄 Creating Redmine issue from GitHub issue #' + issue.number);
+            
+            const hasRedmineCreatedLabel = issue.labels.some(l => l.name === 'state/redmine-created');
+            if (hasRedmineCreatedLabel) {
+              console.log('ℹ️ Redmine issue already created, skipping');
+              return;
+            }
+            
+            await createRedmineIssue(issue);
+            
+            async function createRedmineIssue(githubIssue) {
+              try {
+                const redmineData = {
+                  issue: {
+                    project_id: '${{ secrets.REDMINE_PROJECT_ID }}', // ID проекта в Redmine
+                    tracker_id: '${{ secrets.REDMINE_TRACKER_ID }}', // ID типа задачи (баг/фича и т.д.)
+                    subject: `[GitHub #${githubIssue.number}] ${githubIssue.title}`,
+                    description: formatDescription(githubIssue),
+                    priority_id: getPriorityId(githubIssue),
+                    status_id: 20, // Новый статус
+                    assigned_to_id: '${{ secrets.REDMINE_ASSIGNED_ID }}',
+                    custom_fields: getCustomFields(githubIssue)
+                  }
+                };
+                
+                console.log('📤 Sending to Redmine:', JSON.stringify(redmineData, null, 2));
+                
+                const response = await fetch(`${process.env.REDMINE_URL}/issues.json`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Redmine-API-Key': process.env.REDMINE_API_KEY
+                  },
+                  body: JSON.stringify(redmineData)
+                });
+                
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(`Redmine API error: ${response.status} - ${errorText}`);
+                }
+                
+                const redmineIssue = await response.json();
+                
+                // Добавляем комментарий в GitHub issue
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: `✅ **Задача создана в Redmine**\n\n` +
+                        `**Redmine Issue**: [#${redmineIssue.issue.id}](${process.env.REDMINE_URL}/issues/${redmineIssue.issue.id})\n` +
+                        `**Статус**: ${redmineIssue.issue.status.name}\n` +
+                        `**Создана**: ${new Date().toLocaleString()}`
+                });
+                
+                // Добавляем лейбл отметки о создании
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  labels: ['state/redmine-created']
+                });
+                
+                // Обновляем описание GitHub issue
+                const updatedBody = githubIssue.body + `\n\n---\n\n` +
+                  `## 🔗 Redmine Integration\n\n` +
+                  `✅ Задача создана в Redmine: [#${redmineIssue.issue.id}](${process.env.REDMINE_URL}/issues/${redmineIssue.issue.id})`;
+                
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: updatedBody
+                });
+                
+                console.log('✅ Created Redmine issue #' + redmineIssue.issue.id);
+                
+              } catch (error) {
+                console.log('❌ Failed to create Redmine issue: ' + error.message);
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: `❌ **Ошибка создания задачи в Redmine**\n\n` +
+                        `\`\`\`\n${error.message}\n\`\`\``
+                });
+              }
+            }
+            
+            function formatDescription(githubIssue) {
+              return `h1. GitHub Issue #${githubIssue.number}
+              
+              *Создана из GitHub: ${githubIssue.html_url}*
+              *Автор: ${githubIssue.user.login}*
+              *Создана: ${new Date(githubIssue.created_at).toLocaleString()}*
+              
+              h2. Описание
+              
+              ${githubIssue.body || 'Описание отсутствует'}
+              
+              h2. Метки GitHub
+              
+              ${githubIssue.labels.map(label => `* ${label.name}`).join('\n')}
