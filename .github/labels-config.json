@@ -202,6 +202,16 @@
         "name": "state/auto-created",
         "color": "b60205",
         "description": "Issue auto created"
+      },
+      {
+        "name": "state/to-redmine",
+        "color": "b60205",
+        "description": "Issue redmine create"
+      },
+      {
+        "name": "state/redmine-created",
+        "color": "b60205",
+        "description": "Issue created in redmine"
       }
     ],
     "satellite": [
