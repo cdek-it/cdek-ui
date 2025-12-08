@@ -71,7 +71,7 @@ jobs:
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'X-Redmine-API-Key': process.env.REDMINE_API_KEY
+                    'X-Redmine-API-Key': ${process.env.REDMINE_API_KEY}
                   },
                   body: JSON.stringify(redmineData)
                 });
