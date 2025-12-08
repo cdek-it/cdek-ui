@@ -102,18 +102,6 @@ jobs:
                   labels: ['state/redmine-created']
                 });
                 
-                // Обновляем описание GitHub issue
-                const updatedBody = githubIssue.body + `\n\n---\n\n` +
-                  `## 🔗 Redmine Integration\n\n` +
-                  `✅ Задача создана в Redmine: [#${redmineIssue.issue.id}](${process.env.REDMINE_URL}/issues/${redmineIssue.issue.id})`;
-                
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: githubIssue.number,
-                  body: updatedBody
-                });
-                
                 console.log('✅ Created Redmine issue #' + redmineIssue.issue.id);
                 
               } catch (error) {
