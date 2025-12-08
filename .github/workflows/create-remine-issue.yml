@@ -109,19 +109,3 @@ jobs:
                 });
               }
             }
-            
-            function formatDescription(githubIssue) {
-              return `h1. GitHub Issue #${githubIssue.number}
-              
-              *Создана из GitHub: ${githubIssue.html_url}*
-              *Автор: ${githubIssue.user.login}*
-              *Создана: ${new Date(githubIssue.created_at).toLocaleString()}*
-              
-              h2. Описание
-              
-              ${githubIssue.body || 'Описание отсутствует'}
-              
-              h2. Метки GitHub
-              
-              ${githubIssue.labels.map(label => `* ${label.name}`).join('\n')}
-              }
