@@ -59,7 +59,7 @@ jobs:
                     tracker_id: '${{ secrets.REDMINE_TRACKER_ID }}', // ID типа задачи (баг/фича и т.д.)
                     subject: `[GitHub #${githubIssue.number}] ${githubIssue.title}`,
                     description: formatDescription(githubIssue),
-                    priority_id: getPriorityId(githubIssue),
+                    priority_id: 2,
                     status_id: 20, // Новый статус
                     assigned_to_id: '${{ secrets.REDMINE_ASSIGNED_ID }}'
                   }
