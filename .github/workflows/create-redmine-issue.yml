@@ -67,6 +67,7 @@ jobs:
                                       id: 1563,
                                       value: `#${githubIssue.number}`
                                     }
+                                   ]
                   }
                 };
                 
