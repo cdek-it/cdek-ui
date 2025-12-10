@@ -62,7 +62,11 @@ jobs:
                     priority_id: 2,
                     status_id: 20, // Новый статус
                     assigned_to_id: '${{ secrets.REDMINE_ASSIGNED_ID }}',
-                    custom_fields: `[{id: 1563, value: #${githubIssue.number}}]`
+                    custom_fields: [
+                                    {
+                                      id: 1563,
+                                      value: `#${githubIssue.number}`
+                                    }
                   }
                 };
                 
