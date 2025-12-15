@@ -87,5 +87,4 @@ body:
       render: markdown
     validations:
       required: false
-          required: true
 ---
