@@ -1,0 +1,83 @@
+name: 📢 Notify Mattermost on New Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  notify-mattermost:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification to Mattermost
+        uses: actions/github-script@v7
+        env:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+        with:
+          script: |
+            const { issue, repository } = context.payload;
+            
+            console.log('📢 Sending notification to Mattermost for issue #' + issue.number);
+            
+            await sendToMattermost(issue, repository);
+            
+            async function sendToMattermost(githubIssue, repo) {
+              try {
+                const mattermostMessage = {
+                  username: 'GitHub Bot',
+                  icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+                  attachments: [
+                    {
+                      fallback: `New issue in ${repo.full_name}: ${githubIssue.title}`,
+                      color: '#36a64f', // Green color for new issues
+                      author_name: githubIssue.user.login,
+                      author_icon: githubIssue.user.avatar_url,
+                      author_link: githubIssue.user.html_url,
+                      title: `📋 New Issue: ${githubIssue.title}`,
+                      title_link: githubIssue.html_url,
+                      text: githubIssue.body ? githubIssue.body.substring(0, 300) + (githubIssue.body.length > 300 ? '...' : '') : 'No description provided',
+                      fields: [
+                        {
+                          title: 'Repository',
+                          value: `[${repo.full_name}](${repo.html_url})`,
+                          short: true
+                        },
+                        {
+                          title: 'Issue #',
+                          value: `[#${githubIssue.number}](${githubIssue.html_url})`,
+                          short: true
+                        },
+                        {
+                          title: 'Labels',
+                          value: githubIssue.labels.length > 0 
+                            ? githubIssue.labels.map(label => `\`${label.name}\``).join(', ')
+                            : 'No labels',
+                          short: false
+                        }
+                      ],
+                      footer: 'GitHub Issues',
+                      footer_icon: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+                      ts: Math.floor(new Date(githubIssue.created_at).getTime() / 1000)
+                    }
+                  ]
+                };
+                
+                console.log('📤 Sending to Mattermost:', JSON.stringify(mattermostMessage, null, 2));
+                
+                const response = await fetch(process.env.MATTERMOST_WEBHOOK_URL, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(mattermostMessage)
+                });
+                
+                if (!response.ok) {
+                  throw new Error(`Mattermost API error: ${response.status} - ${await response.text()}`);
+                }
+                
+                console.log('✅ Notification sent to Mattermost');
+                
+              } catch (error) {
+                console.log('❌ Failed to send notification to Mattermost: ' + error.message);
+              }
+            }
