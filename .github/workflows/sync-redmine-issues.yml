@@ -1,0 +1,263 @@
+name: 🚀 Redmine ↔ GitHub Issue Sync
+
+on:
+  issues:
+    types: [labeled]
+
+  # Проверка закрытых задач в Redmine каждые 15 минут
+  schedule:
+    - cron: '*/15 * * * *'
+
+  # Возможность ручного запуска синхронизации
+  workflow_dispatch:
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # JOB 1: Создание задачи в Redmine из GitHub Issue
+  # ══════════════════════════════════════════════════════════════
+  create-redmine-issue:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.label.name == 'state/to-redmine'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Redmine Issue
+        uses: actions/github-script@v7
+        env:
+          REDMINE_URL: ${{ secrets.REDMINE_URL }}
+        with:
+          script: |
+            const { issue } = context.payload;
+
+            console.log('🔄 Creating Redmine issue from GitHub issue #' + issue.number);
+
+            const hasRedmineCreatedLabel = issue.labels.some(l => l.name === 'state/redmine-created');
+            if (hasRedmineCreatedLabel) {
+              console.log('ℹ️ Redmine issue already created, skipping');
+              return;
+            }
+
+            function formatDescription(githubIssue) {
+              return `GitHub Issue #${githubIssue.number}
+
+              *Создана из GitHub: ${githubIssue.html_url}*
+              *Автор: ${githubIssue.user.login}*
+              *Создана: ${new Date(githubIssue.created_at).toLocaleString()}*
+
+              Описание
+
+              ${githubIssue.body || 'Описание отсутствует'}
+
+              Метки GitHub
+
+              ${githubIssue.labels.map(label => `* ${label.name}`).join('\\n')}
+
+              ---
+              *Автоматически создано из GitHub*`;
+            }
+
+            await createRedmineIssue(issue);
+
+            async function createRedmineIssue(githubIssue) {
+              try {
+                const redmineData = {
+                  issue: {
+                    project_id: '${{ secrets.REDMINE_PROJECT_ID }}',
+                    tracker_id: '${{ secrets.REDMINE_TRACKER_ID }}',
+                    subject: `[GitHub #${githubIssue.number}] ${githubIssue.title}`,
+                    description: formatDescription(githubIssue),
+                    priority_id: 2,
+                    status_id: 20,
+                    assigned_to_id: '${{ secrets.REDMINE_ASSIGNED_ID }}',
+                    custom_fields: [
+                      {
+                        id: 1563,
+                        value: `#${githubIssue.number}`
+                      }
+                    ]
+                  }
+                };
+
+                console.log('📤 Sending to Redmine:', JSON.stringify(redmineData, null, 2));
+
+                const response = await fetch(`${process.env.REDMINE_URL}/issues.json`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Redmine-API-Key': '${{ secrets.REDMINE_API_KEY }}'
+                  },
+                  body: JSON.stringify(redmineData)
+                });
+
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(`Redmine API error: ${response.status} - ${errorText}`);
+                }
+
+                const redmineIssue = await response.json();
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: `✅ **Задача создана в Redmine**\\n\\n` +
+                        `**Redmine Issue**: [#${redmineIssue.issue.id}](${process.env.REDMINE_URL}/issues/${redmineIssue.issue.id})\\n` +
+                        `**Статус**: ${redmineIssue.issue.status.name}\\n` +
+                        `**Создана**: ${new Date().toLocaleString()}`
+                });
+
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  labels: ['state/redmine-created']
+                });
+
+                const updatedBody = githubIssue.body + `\\n\\n---\\n\\n` +
+                  `## 🔗 Redmine Integration\\n\\n` +
+                  `✅ Задача создана в Redmine: [#${redmineIssue.issue.id}](${process.env.REDMINE_URL}/issues/${redmineIssue.issue.id})`;
+
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: updatedBody
+                });
+
+                console.log('✅ Created Redmine issue #' + redmineIssue.issue.id);
+
+              } catch (error) {
+                console.log('❌ Failed to create Redmine issue: ' + error.message);
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: githubIssue.number,
+                  body: `❌ **Ошибка создания задачи в Redmine**\\n\\n` +
+                        `\\`\\`\\`\\n${error.message}\\n\\`\\`\\``
+                });
+              }
+            }
+
+  # ══════════════════════════════════════════════════════════════
+  # JOB 2: Синхронизация закрытых задач из Redmine в GitHub
+  # ══════════════════════════════════════════════════════════════
+  sync-closed-from-redmine:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Sync Closed Redmine Issues to GitHub
+        uses: actions/github-script@v7
+        env:
+          REDMINE_URL: ${{ secrets.REDMINE_URL }}
+          REDMINE_API_KEY: ${{ secrets.REDMINE_API_KEY }}
+          REDMINE_PROJECT_ID: ${{ secrets.REDMINE_PROJECT_ID }}
+          REDMINE_CLOSED_STATUS_ID: ${{ secrets.REDMINE_CLOSED_STATUS_ID }}
+        with:
+          script: |
+            console.log('🔄 Checking for closed Redmine issues...');
+
+            // ─── Настройки ───────────────────────────────────────────
+            // ID статусов Redmine, которые считаются "закрытыми"
+            // Можно указать несколько через запятую в секрете REDMINE_CLOSED_STATUS_ID
+            // Например: "5,6" (Closed, Rejected)
+            // Если секрет не задан, используется ID 5 по умолчанию
+            const closedStatusIds = (process.env.REDMINE_CLOSED_STATUS_ID || '5')
+              .split(',')
+              .map(id => id.trim());
+
+            // ─── Шаг 1: Получаем все открытые GitHub issues с лейблом redmine-created ──
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'state/redmine-created',
+              per_page: 100
+            });
+
+            if (openIssues.length === 0) {
+              console.log('ℹ️ No open GitHub issues with redmine-created label found');
+              return;
+            }
+
+            console.log(`📋 Found ${openIssues.length} open GitHub issues linked to Redmine`);
+
+            // ─── Шаг 2: Для каждого issue извлекаем Redmine ID и проверяем статус ──
+            for (const issue of openIssues) {
+              try {
+                // Извлекаем Redmine issue ID из комментария или тела issue
+                const redmineIdMatch = issue.body?.match(/Redmine.*?#(\d+)/i) 
+                  || issue.body?.match(/\/issues\/(\d+)/);
+
+                if (!redmineIdMatch) {
+                  console.log(`⚠️ GitHub issue #${issue.number}: no Redmine ID found in body, skipping`);
+                  continue;
+                }
+
+                const redmineIssueId = redmineIdMatch[1];
+                console.log(`🔍 Checking Redmine issue #${redmineIssueId} for GitHub issue #${issue.number}`);
+
+                // Запрашиваем статус задачи в Redmine
+                const response = await fetch(
+                  `${process.env.REDMINE_URL}/issues/${redmineIssueId}.json`,
+                  {
+                    headers: {
+                      'X-Redmine-API-Key': process.env.REDMINE_API_KEY
+                    }
+                  }
+                );
+
+                if (!response.ok) {
+                  console.log(`⚠️ Failed to fetch Redmine issue #${redmineIssueId}: ${response.status}`);
+                  continue;
+                }
+
+                const redmineData = await response.json();
+                const redmineStatus = redmineData.issue.status;
+
+                console.log(`   Redmine #${redmineIssueId} status: ${redmineStatus.name} (id: ${redmineStatus.id})`);
+
+                // ─── Шаг 3: Если задача закрыта в Redmine — закрываем в GitHub ──
+                if (closedStatusIds.includes(String(redmineStatus.id))) {
+                  console.log(`🔒 Closing GitHub issue #${issue.number} (Redmine #${redmineIssueId} is "${redmineStatus.name}")`);
+
+                  // Добавляем комментарий о закрытии
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: `🔒 **Задача закрыта автоматически**\n\n` +
+                          `Задача [#${redmineIssueId}](${process.env.REDMINE_URL}/issues/${redmineIssueId}) ` +
+                          `была закрыта в Redmine со статусом: **${redmineStatus.name}**\n\n` +
+                          `*Синхронизировано: ${new Date().toISOString()}*`
+                  });
+
+                  // Закрываем issue
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'completed'
+                  });
+
+                  // Добавляем лейбл о закрытии из Redmine
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: ['state/redmine-closed']
+                  });
+
+                  console.log(`✅ GitHub issue #${issue.number} closed successfully`);
+                }
+
+              } catch (error) {
+                console.log(`❌ Error processing GitHub issue #${issue.number}: ${error.message}`);
+              }
+            }
+
+            console.log('✅ Sync completed');
