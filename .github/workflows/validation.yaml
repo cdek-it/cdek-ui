@@ -8,7 +8,7 @@ jobs:
       - name: Test API call with secret
         env:
           # Имя секрета в GitHub, например MY_API_TOKEN
-          TOKEN: ${{ secrets.MINE_TEST_TOKEN }}
+          TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
         run: |
           # -s (тихий режим), -f (завершиться с ошибкой при HTTP-ошибке)
           # -o /dev/null отбрасывает тело ответа, нас интересует только код состояния
