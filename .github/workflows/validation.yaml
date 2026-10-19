@@ -1,0 +1,27 @@
+name: Validate Token
+on: [workflow_dispatch] # Позволяет запускать вручную
+
+jobs:
+  test-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test API call with secret
+        env:
+          # Имя секрета в GitHub, например MY_API_TOKEN
+          TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          # -s (тихий режим), -f (завершиться с ошибкой при HTTP-ошибке)
+          # -o /dev/null отбрасывает тело ответа, нас интересует только код состояния
+          # -w "%{http_code}" выводит HTTP-код
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/user)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Токен валиден (HTTP 200)."
+          else
+            echo "❌ Ошибка: токен недействителен или недостаточно прав (HTTP $HTTP_CODE)."
+            exit 1
+          fi
